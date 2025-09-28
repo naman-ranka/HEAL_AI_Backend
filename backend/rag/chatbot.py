@@ -273,7 +273,15 @@ class InsuranceChatbot:
         """Build the RAG prompt with enhanced context"""
         return f"""You are HEAL, an expert insurance policy assistant. Your role is to help users understand their insurance policies based on the provided policy information.
 
-**Guidelines:**
+FORMATTING REQUIREMENTS:
+- Use PLAIN TEXT formatting (NO markdown, NO **bold**, NO *italic*)
+- Format lists as bullet points using • character followed by space and line break
+- Use clear section headers in ALL CAPS
+- Keep responses concise and scannable
+- NEVER use **text** or *text* formatting
+- Each bullet point must be on its own line with empty line after it
+
+RESPONSE GUIDELINES:
 1. Use BOTH the policy overview and specific policy sections to provide comprehensive answers
 2. Start with information from the policy overview when available, then reference specific sections
 3. If information is not in the provided context, clearly state "I don't have that information in your policy documents"
@@ -283,14 +291,24 @@ class InsuranceChatbot:
 7. When referencing specific amounts or details, mention if they come from the overview vs specific sections
 8. If you're uncertain, say so and suggest contacting the insurance company
 
-**Available Policy Information:**
+FORMAT YOUR RESPONSE LIKE THIS:
+• [Main answer to the question]
+
+• [Supporting details from policy]
+
+KEY DETAILS:
+• [Important specific information]
+
+• [Relevant amounts or conditions]
+
+AVAILABLE POLICY INFORMATION:
 {context}
 
-**User Question:**
+USER QUESTION:
 {user_message}
 
-**Your Response:**
-Based on the policy information provided, """
+YOUR RESPONSE (use plain text with bullet points):
+"""
 
     def _build_conversational_rag_prompt(self, user_message: str, context: str, conversation_history: List[Dict[str, Any]] = None) -> str:
         """Build a conversational RAG prompt with chat history"""
@@ -306,43 +324,104 @@ Based on the policy information provided, """
         
         return f"""You are HEAL, an expert insurance policy assistant. You maintain conversational context and help users understand their insurance policies.
 
-**Guidelines:**
-1. **MAINTAIN CONVERSATION FLOW**: Reference previous questions and answers when relevant
-2. **USE CONVERSATIONAL CONTEXT**: Build on what was previously discussed
-3. **BE CONSISTENT**: Don't contradict previous answers unless correcting an error
-4. **REFER BACK**: Use phrases like "As I mentioned earlier..." or "Building on your previous question..."
-5. **CLARIFY WHEN NEEDED**: If the user is asking about something mentioned before, acknowledge it
-6. **Use BOTH the policy overview and specific policy sections for comprehensive answers**
-7. **If information is not in the provided context, clearly state "I don't have that information in your policy documents"**
-8. **Be helpful, clear, and concise with simple language**
-9. **Always be accurate and conservative in your responses**
-10. **When referencing specific amounts, mention if they come from overview vs specific sections**
+IMPORTANT FORMATTING RULES:
+- Use PLAIN TEXT formatting (NO markdown, NO **bold**, NO *italic*)
+- Format lists as bullet points using • character followed by space and line break
+- Use clear section headers in ALL CAPS
+- Keep responses concise and scannable
+- NEVER use **text** or *text* formatting
+- Each bullet point must be on its own line with empty line after it
+- Break down complex information into digestible points
 
-{history_context}**Available Policy Information:**
+RESPONSE GUIDELINES:
+1. MAINTAIN CONVERSATION FLOW: Reference previous questions and answers when relevant
+2. USE CONVERSATIONAL CONTEXT: Build on what was previously discussed
+3. BE CONSISTENT: Don't contradict previous answers unless correcting an error
+4. REFER BACK: Use phrases like "As I mentioned earlier..." or "Building on your previous question..."
+5. CLARIFY WHEN NEEDED: If the user is asking about something mentioned before, acknowledge it
+6. Use BOTH the policy overview and specific policy sections for comprehensive answers
+7. If information is not in the provided context, clearly state "I don't have that information in your policy documents"
+8. Be helpful, clear, and concise with simple language
+9. Always be accurate and conservative in your responses
+10. When referencing specific amounts, mention if they come from overview vs specific sections
+
+FORMAT YOUR RESPONSE LIKE THIS EXAMPLE:
+• [Main point about the topic]
+
+• [Supporting detail or clarification]
+
+• [Additional relevant information]
+
+KEY DETAILS:
+• [Important specific information]
+
+• [Relevant amounts or limits]
+
+WHAT THIS MEANS FOR YOU:
+• [Practical implication]
+
+• [Action you might take]
+
+{history_context}AVAILABLE POLICY INFORMATION:
 {context}
 
-**Current User Question:**
+CURRENT USER QUESTION:
 {user_message}
 
-**Your Response:**
+YOUR RESPONSE (use plain text with bullet points):
 """
     
     def _generate_fallback_response(self, user_message: str, chunks: List[RetrievedChunk], conversation_history: List[Dict[str, Any]] = None) -> str:
         """Generate a fallback response when AI is not available"""
         if not chunks:
-            return "I don't have enough information in your policy documents to answer that question. Please contact your insurance company for specific details."
+            return """• I don't have enough information in your policy documents to answer that question
+
+• Please contact your insurance company for specific details
+
+NEXT STEPS:
+• Call the customer service number on your insurance card
+
+• Reference your policy number when asking questions"""
         
         # Simple keyword-based response
         message_lower = user_message.lower()
         
         if any(word in message_lower for word in ['deductible', 'deduct']):
-            return "Based on your policy documents, I found information about deductibles. Please review the policy details or contact your insurance company for specific amounts."
+            return """• I found information about deductibles in your policy documents
+
+• The specific amounts need verification with your insurance company
+
+NEXT STEPS:
+• Review the policy details in your documents
+
+• Contact your insurance company for exact deductible amounts"""
         elif any(word in message_lower for word in ['copay', 'co-pay', 'copayment']):
-            return "I found information about copayments in your policy. Please check the specific policy sections or contact your insurance company for exact amounts."
+            return """• I found information about copayments in your policy
+
+• Specific copay amounts vary by service type
+
+NEXT STEPS:
+• Check the specific policy sections for service details
+
+• Contact your insurance company for exact copay amounts"""
         elif any(word in message_lower for word in ['out of pocket', 'maximum', 'limit']):
-            return "Your policy contains information about out-of-pocket maximums. Please review the policy details or contact your insurance company for specific limits."
+            return """• Your policy contains information about out-of-pocket maximums
+
+• These limits protect you from excessive medical costs
+
+NEXT STEPS:
+• Review the policy details for specific limit amounts
+
+• Contact your insurance company for current year limits"""
         else:
-            return f"I found {len(chunks)} relevant sections in your policy documents. Please review the policy details or contact your insurance company for specific information about your question."
+            return f"""• I found {len(chunks)} relevant sections in your policy documents
+
+• The information needs further clarification for your specific question
+
+NEXT STEPS:
+• Review the relevant policy sections
+
+• Contact your insurance company for detailed information"""
     
     def _calculate_response_confidence(self, chunks: List[RetrievedChunk]) -> float:
         """Calculate confidence score based on retrieval quality"""
@@ -362,9 +441,13 @@ Based on the policy information provided, """
         """Prepare source information for response"""
         sources = []
         for chunk in chunks:
+            # Fix undefined document names and NaN similarities
+            document_name = chunk.source_document if chunk.source_document and chunk.source_document != "undefined" else "Policy Document"
+            similarity = chunk.similarity_score if chunk.similarity_score and not str(chunk.similarity_score).lower() == 'nan' else 0.0
+            
             sources.append({
-                "document": chunk.source_document,
-                "similarity": round(chunk.similarity_score, 3),
+                "document": document_name,
+                "similarity": round(similarity, 3),
                 "preview": chunk.text[:150] + "..." if len(chunk.text) > 150 else chunk.text,
                 "chunk_id": chunk.chunk_id
             })

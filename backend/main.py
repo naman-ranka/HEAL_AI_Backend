@@ -1471,6 +1471,95 @@ def create_mock_bill_analysis(bill_id: str) -> dict:
         "note": "Mock analysis - configure GEMINI_API_KEY environment variable for real AI-powered bill analysis"
     }
 
+def generate_professional_dispute_email(
+    analysis_id: str,
+    patient_name: str,
+    provider_name: str,
+    service_date: str,
+    bill_filename: str,
+    total_charges: float,
+    insurance_payment: float,
+    patient_responsibility: float,
+    disputed_amount: float,
+    dispute_reason: str,
+    analysis_data: dict
+) -> str:
+    """Generate a professional medical billing dispute email"""
+    
+    # Extract service details from analysis if available
+    bill_summary = analysis_data.get("bill_summary", {})
+    service_details = bill_summary.get("serviceDetails", [])
+    dispute_check = analysis_data.get("discrepancy_check", "")
+    
+    # Format the dispute email - plain text format
+    email_content = f"""Subject: Billing Dispute - Account #{analysis_id} - {patient_name}
+
+Dear Billing Department,
+
+I am formally disputing charges on the medical bill for {patient_name}, service date {service_date}, in accordance with my rights under the Fair Debt Collection Practices Act (FDCPA).
+
+PATIENT INFORMATION:
+• Patient: {patient_name}
+• Service Date: {service_date}
+• Provider: {provider_name}
+• Bill Reference: {bill_filename}
+• Dispute ID: {analysis_id}
+
+DISPUTED CHARGES:
+• Total Billed: ${total_charges:.2f}
+• Insurance Paid: ${insurance_payment:.2f}
+• Patient Responsibility: ${patient_responsibility:.2f}
+• Amount in Dispute: ${disputed_amount:.2f}
+
+DISPUTE REASON:
+{dispute_reason}
+
+ANALYSIS FINDINGS:
+{dispute_check if dispute_check else "Upon review of the EOB and policy terms, billing discrepancies have been identified that require correction."}"""
+
+    # Add service details if available (limit to top 3 for conciseness)
+    if service_details:
+        email_content += f"\n\nSPECIFIC SERVICES QUESTIONED:"
+        for i, service in enumerate(service_details[:3], 1):  # Limit to 3 services
+            service_desc = service.get("serviceDescription", "Service")
+            service_code = service.get("serviceCode", "N/A")
+            patient_owed = service.get("patientOwed", 0)
+            
+            email_content += f"""
+{i}. {service_desc} (CPT: {service_code}) - Patient Owed: ${patient_owed:.2f}"""
+
+    email_content += f"""
+
+REQUESTED DOCUMENTATION:
+1. Itemized statement with CPT/HCPCS codes and modifiers
+2. EOB processing verification against my Summary of Benefits and Coverage (SBC)
+3. Coding accuracy confirmation (CPT procedures, ICD-10 diagnoses)
+4. Calculation breakdown for deductibles, copays, and coinsurance
+5. In-network/out-of-network designation verification
+
+REQUIRED ACTIONS:
+• Hold collection activities pending resolution
+• Provide written response within 30 days (FDCPA compliance)
+• Issue corrected billing statement
+• Submit supporting documentation for disputed charges
+
+PATIENT RIGHTS:
+I assert my rights under the FDCPA, No Surprises Act, and applicable state balance billing protections. I request immediate review and correction of billing errors.
+
+Please direct all correspondence to this email and reference dispute ID {analysis_id}.
+
+Sincerely,
+{patient_name}
+Patient/Account Holder
+
+ATTACHMENTS: EOB, Insurance policy documentation, Analysis report ({analysis_id})
+
+---
+Generated via AI-powered medical bill analysis. Reference: {analysis_id}
+"""
+
+    return email_content
+
 async def store_bill_analysis(analysis_id: str, bill_id: str, policy_id: str, analysis_result: dict):
     """Store bill analysis results in database"""
     try:
@@ -1506,6 +1595,128 @@ async def store_bill_analysis(analysis_id: str, bill_id: str, policy_id: str, an
             
     except Exception as e:
         logger.error(f"❌ Failed to store bill analysis: {e}")
+
+@app.get("/bill-checker/analysis/{analysis_id}")
+async def get_bill_analysis(analysis_id: str):
+    """Get specific bill analysis by ID"""
+    try:
+        from database import get_db_connection
+        conn = get_db_connection()
+        
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT 
+                    ba.id,
+                    ba.analysis_result,
+                    ba.created_at,
+                    ba.confidence_score,
+                    d.filename as bill_filename,
+                    d.id as bill_document_id
+                FROM bill_analyses ba
+                LEFT JOIN documents d ON ba.bill_document_id = d.id
+                WHERE ba.id = ?
+            """, (analysis_id,))
+            
+            row = cursor.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Analysis not found")
+            
+            # Parse the stored analysis data
+            analysis_data = json.loads(row[1]) if row[1] else {}
+            
+            return {
+                "analysis_id": row[0],
+                "bill_filename": row[4] or "Unknown",
+                "bill_document_id": row[5],
+                "analysis_date": row[2],
+                "confidence_score": row[3] or 0.0,
+                **analysis_data  # Include all the analysis details
+            }
+            
+        finally:
+            conn.close()
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error getting bill analysis {analysis_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/bill-checker/analysis/{analysis_id}/dispute")
+async def generate_dispute_email(analysis_id: str, request: dict):
+    """Generate professional dispute email for billing issues"""
+    try:
+        from database import get_db_connection
+        conn = get_db_connection()
+        
+        try:
+            cursor = conn.cursor()
+            # Get the bill analysis data
+            cursor.execute("""
+                SELECT 
+                    ba.id,
+                    ba.analysis_result,
+                    ba.patient_responsibility,
+                    ba.total_charges,
+                    ba.insurance_payment,
+                    d.filename as bill_filename,
+                    d.original_name
+                FROM bill_analyses ba
+                LEFT JOIN documents d ON ba.bill_document_id = d.id
+                WHERE ba.id = ?
+            """, (analysis_id,))
+            
+            row = cursor.fetchone()
+            if not row:
+                raise HTTPException(status_code=404, detail="Analysis not found")
+            
+            # Parse analysis data
+            analysis_data = json.loads(row[1]) if row[1] else {}
+            
+            # Extract dispute details from request
+            dispute_reason = request.get("dispute_reason", "Billing discrepancy identified")
+            patient_name = request.get("patient_name", "Patient")
+            provider_name = request.get("provider_name", "Healthcare Provider")
+            service_date = request.get("service_date", "N/A")
+            disputed_amount = request.get("disputed_amount", row[2])  # Patient responsibility
+            
+            # Generate professional dispute email
+            email_content = generate_professional_dispute_email(
+                analysis_id=analysis_id,
+                patient_name=patient_name,
+                provider_name=provider_name,
+                service_date=service_date,
+                bill_filename=row[6] or "Medical Bill",
+                total_charges=row[3] or 0.0,
+                insurance_payment=row[4] or 0.0,
+                patient_responsibility=row[2] or 0.0,
+                disputed_amount=disputed_amount,
+                dispute_reason=dispute_reason,
+                analysis_data=analysis_data
+            )
+            
+            return {
+                "analysis_id": analysis_id,
+                "email_content": email_content,
+                "dispute_details": {
+                    "patient_name": patient_name,
+                    "provider_name": provider_name,
+                    "service_date": service_date,
+                    "disputed_amount": disputed_amount,
+                    "total_charges": row[3],
+                    "bill_filename": row[6]
+                }
+            }
+            
+        finally:
+            conn.close()
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Error generating dispute email: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/bill-checker/history")
 async def get_bill_analysis_history(limit: int = 10):

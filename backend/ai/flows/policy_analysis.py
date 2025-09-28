@@ -45,25 +45,29 @@ async def analyze_insurance_policy(input_data: PolicyAnalysisInput) -> PolicyAna
         
         # Prepare the analysis prompt with JSON schema instructions
         analysis_prompt = """
-        You are an expert insurance policy analyst. Analyze the provided insurance document and extract the following information with high accuracy:
+        You are an expert insurance policy analyst. Extract key insurance values in a clean, standardized format.
 
-        1. **Deductible**: The amount the policyholder must pay before insurance coverage begins
-        2. **Out-of-Pocket Maximum**: The maximum amount the policyholder will pay in a year
-        3. **Copay**: The fixed amount paid for covered services
+        **EXTRACTION RULES:**
+        1. **Format**: Always use exact dollar amounts: "$X,XXX" or "$XX"
+        2. **Precision**: Extract the PRIMARY/INDIVIDUAL amounts (not family unless only family is shown)
+        3. **Conciseness**: Return only the clean dollar amount, no extra text
+        4. **Missing Data**: Use "Not specified" if amount is unclear or not found
 
-        **Instructions:**
-        - Extract exact amounts with currency symbols when available
-        - If information is not clearly stated, use "Not found"
-        - Be precise and conservative in your extraction
-        - Look for terms like "deductible", "out-of-pocket max", "copay", "copayment"
-        - Consider both individual and family amounts if present
+        **TARGET VALUES:**
+        - **Deductible**: Annual amount paid before coverage starts
+        - **Out-of-Pocket Max**: Maximum annual cost to patient  
+        - **Copay**: Fixed fee per visit/service
 
-        **Return your response as a JSON object with these exact keys:**
+        **OUTPUT FORMAT (JSON only):**
         {
-            "deductible": "extracted deductible amount or 'Not found'",
-            "out_of_pocket_max": "extracted out-of-pocket maximum or 'Not found'",
-            "copay": "extracted copay amount or 'Not found'"
+            "deductible": "$X,XXX",
+            "out_of_pocket_max": "$X,XXX", 
+            "copay": "$XX"
         }
+
+        **EXAMPLES:**
+        ✅ Good: "$2,500", "$50", "$10,000"
+        ❌ Bad: "$2,500 individual deductible per year", "Copay varies by service $25-50"
 
         **Document to analyze:**
         """
@@ -226,11 +230,11 @@ def _parse_analysis_response(response_text: str) -> PolicyAnalysisOutput:
         # Parse JSON
         parsed_data = json.loads(json_text)
         
-        # Create structured output
+        # Create structured output with clean formatting
         return PolicyAnalysisOutput(
-            deductible=parsed_data.get("deductible", "Not found"),
-            out_of_pocket_max=parsed_data.get("out_of_pocket_max", "Not found"),
-            copay=parsed_data.get("copay", "Not found"),
+            deductible=_clean_value(parsed_data.get("deductible", "Not specified")),
+            out_of_pocket_max=_clean_value(parsed_data.get("out_of_pocket_max", "Not specified")),
+            copay=_clean_value(parsed_data.get("copay", "Not specified")),
             confidence_score=0.9,  # High confidence for successful parsing
             additional_info={"parsing_method": "json_extraction"}
         )
@@ -291,6 +295,44 @@ def _extract_values_from_text(text: str) -> PolicyAnalysisOutput:
         confidence_score=0.6,  # Lower confidence for text extraction
         additional_info={"parsing_method": "text_extraction"}
     )
+
+
+def _clean_value(value: str) -> str:
+    """
+    Clean and standardize extracted insurance values
+    
+    Args:
+        value: Raw extracted value
+        
+    Returns:
+        Cleaned, standardized value
+    """
+    if not value or value.lower().strip() in ['not found', 'not available', 'n/a', '']:
+        return "Not specified"
+    
+    # Remove extra whitespace and quotes
+    cleaned = value.strip().strip('"').strip("'")
+    
+    # Ensure proper currency formatting
+    if cleaned.lower() in ['not found', 'not available', 'not specified']:
+        return "Not specified"
+    
+    # If it's already a clean dollar amount, return as-is
+    if cleaned.startswith('$') and cleaned.replace('$', '').replace(',', '').replace('.', '').isdigit():
+        return cleaned
+    
+    # Try to extract dollar amount from text
+    import re
+    dollar_match = re.search(r'\$[\d,]+(?:\.\d{2})?', cleaned)
+    if dollar_match:
+        return dollar_match.group(0)
+    
+    # If we have just numbers, add dollar sign
+    number_match = re.search(r'\b\d{1,3}(?:,\d{3})*(?:\.\d{2})?\b', cleaned)
+    if number_match:
+        return f"${number_match.group(0)}"
+    
+    return "Not specified"
 
 
 def _extract_pdf_text(pdf_data: bytes) -> str:
