@@ -178,11 +178,37 @@ async def upload_document(file: UploadFile = File(...)) -> PolicyAnalysisOutput:
         raise
     except Exception as e:
         logger.error(f"Error processing document {getattr(file, 'filename', 'unknown')}: {e}")
-        # Return structured error response
+        # Return structured error response with new format
+        from ai.schemas import (PolicyDetailsOutput, CoverageCostsOutput, NetworkCoverageInfo, 
+                               DeductibleInfo, OutOfPocketMaxInfo, CommonServiceOutput, 
+                               PrescriptionsOutput, PrescriptionTierOutput, ImportantNoteOutput)
+        
         error_response = PolicyAnalysisOutput(
-            deductible="Analysis failed",
-            out_of_pocket_max="Analysis failed",
-            copay="Analysis failed", 
+            policyDetails=PolicyDetailsOutput(
+                policyHolder="Analysis failed",
+                policyNumber="Analysis failed",
+                carrier="Analysis failed",
+                effectiveDate="Analysis failed"
+            ),
+            coverageCosts=CoverageCostsOutput(
+                inNetwork=NetworkCoverageInfo(
+                    deductible=DeductibleInfo(individual=0, family=0),
+                    outOfPocketMax=OutOfPocketMaxInfo(individual=0, family=0),
+                    coinsurance="0%"
+                ),
+                outOfNetwork=NetworkCoverageInfo(
+                    deductible=DeductibleInfo(individual=0, family=0),
+                    outOfPocketMax=OutOfPocketMaxInfo(individual=0, family=0),
+                    coinsurance="0%"
+                )
+            ),
+            commonServices=[],
+            prescriptions=PrescriptionsOutput(
+                hasSeparateDeductible=False,
+                deductible=0,
+                tiers=[]
+            ),
+            importantNotes=[],
             confidence_score=0.0,
             additional_info={"error": str(e)}
         )
@@ -199,32 +225,51 @@ def validate_analysis_result(analysis_result: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Cleaned and validated result
     """
-    required_keys = ["deductible", "out_of_pocket_max", "copay"]
+    # Updated validation for new structured format
+    required_keys = ["policyDetails", "coverageCosts", "commonServices", "prescriptions", "importantNotes"]
     
     # If we got a valid response with the required keys
     if all(key in analysis_result for key in required_keys):
-        return {
-            "deductible": analysis_result["deductible"],
-            "out_of_pocket_max": analysis_result["out_of_pocket_max"],
-            "copay": analysis_result["copay"]
-        }
+        return analysis_result
     
     # If we got a raw response, try to extract what we can
     if "raw_response" in analysis_result:
-        logger.warning("Received raw response, using fallback extraction")
+        logger.warning("Received raw response, using fallback structure")
+        # Return a basic structure for backwards compatibility
+        from ai.schemas import (PolicyDetailsOutput, CoverageCostsOutput, NetworkCoverageInfo, 
+                               DeductibleInfo, OutOfPocketMaxInfo, CommonServiceOutput, 
+                               PrescriptionsOutput, PrescriptionTierOutput, ImportantNoteOutput)
+        
         return {
-            "deductible": "Could not extract",
-            "out_of_pocket_max": "Could not extract",
-            "copay": "Could not extract",
-            "note": "Analysis completed but data extraction was incomplete"
+            "policyDetails": {
+                "policyHolder": "Could not extract",
+                "policyNumber": "Could not extract", 
+                "carrier": "Could not extract",
+                "effectiveDate": "Could not extract"
+            },
+            "coverageCosts": {
+                "inNetwork": {
+                    "deductible": {"individual": 0, "family": 0},
+                    "outOfPocketMax": {"individual": 0, "family": 0},
+                    "coinsurance": "0%"
+                },
+                "outOfNetwork": {
+                    "deductible": {"individual": 0, "family": 0},
+                    "outOfPocketMax": {"individual": 0, "family": 0},
+                    "coinsurance": "0%"
+                }
+            },
+            "commonServices": [],
+            "prescriptions": {
+                "hasSeparateDeductible": False,
+                "deductible": 0,
+                "tiers": []
+            },
+            "importantNotes": [{"type": "Extraction Error", "details": "Analysis completed but data extraction was incomplete"}]
         }
     
-    # Default fallback
-    return {
-        "deductible": analysis_result.get("deductible", "Not found"),
-        "out_of_pocket_max": analysis_result.get("out_of_pocket_max", "Not found"),
-        "copay": analysis_result.get("copay", "Not found")
-    }
+    # Default fallback - return existing data as-is
+    return analysis_result
 
 
 def save_to_database(data: Dict[str, Any]) -> None:

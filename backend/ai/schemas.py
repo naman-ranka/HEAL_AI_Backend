@@ -21,17 +21,63 @@ class PolicyAnalysisInput(BaseModel):
     filename: str = Field(description="Original filename of the document")
 
 
+class PolicyDetailsOutput(BaseModel):
+    """Policy holder and carrier information"""
+    policyHolder: str = Field(description="Policy holder name")
+    policyNumber: str = Field(description="Policy number")
+    carrier: str = Field(description="Insurance carrier name")
+    effectiveDate: str = Field(description="Policy effective date")
+
+class DeductibleInfo(BaseModel):
+    """Deductible information for individual and family"""
+    individual: float = Field(description="Individual deductible amount")
+    family: float = Field(description="Family deductible amount")
+
+class OutOfPocketMaxInfo(BaseModel):
+    """Out-of-pocket maximum information for individual and family"""
+    individual: float = Field(description="Individual out-of-pocket maximum")
+    family: float = Field(description="Family out-of-pocket maximum")
+
+class NetworkCoverageInfo(BaseModel):
+    """Coverage information for a specific network type"""
+    deductible: DeductibleInfo = Field(description="Deductible information")
+    outOfPocketMax: OutOfPocketMaxInfo = Field(description="Out-of-pocket maximum information")
+    coinsurance: str = Field(description="Coinsurance percentage")
+
+class CoverageCostsOutput(BaseModel):
+    """Coverage costs for in-network and out-of-network"""
+    inNetwork: NetworkCoverageInfo = Field(description="In-network coverage information")
+    outOfNetwork: NetworkCoverageInfo = Field(description="Out-of-network coverage information")
+
+class CommonServiceOutput(BaseModel):
+    """Common service information"""
+    service: str = Field(description="Service name")
+    cost: str = Field(description="Service cost")
+    notes: str = Field(description="Additional notes about the service")
+
+class PrescriptionTierOutput(BaseModel):
+    """Prescription tier information"""
+    tier: str = Field(description="Prescription tier name")
+    cost: str = Field(description="Prescription tier cost")
+
+class PrescriptionsOutput(BaseModel):
+    """Prescription coverage information"""
+    hasSeparateDeductible: bool = Field(description="Whether prescriptions have a separate deductible")
+    deductible: float = Field(description="Prescription deductible amount")
+    tiers: List[PrescriptionTierOutput] = Field(description="Prescription tier information")
+
+class ImportantNoteOutput(BaseModel):
+    """Important policy note"""
+    type: str = Field(description="Type of important note")
+    details: str = Field(description="Details of the important note")
+
 class PolicyAnalysisOutput(BaseModel):
     """Structured output for insurance policy analysis"""
-    deductible: str = Field(
-        description="The deductible amount from the insurance policy. Use 'Not found' if not available."
-    )
-    out_of_pocket_max: str = Field(
-        description="The out-of-pocket maximum amount. Use 'Not found' if not available."
-    )
-    copay: str = Field(
-        description="The copay amount for services. Use 'Not found' if not available."
-    )
+    policyDetails: PolicyDetailsOutput = Field(description="Policy holder and carrier information")
+    coverageCosts: CoverageCostsOutput = Field(description="Coverage costs for different networks")
+    commonServices: List[CommonServiceOutput] = Field(description="Common services and their costs")
+    prescriptions: PrescriptionsOutput = Field(description="Prescription coverage information")
+    importantNotes: List[ImportantNoteOutput] = Field(description="Important policy notes and requirements")
     confidence_score: float = Field(
         description="Confidence score from 0.0 to 1.0 indicating extraction accuracy",
         ge=0.0,
