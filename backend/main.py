@@ -978,11 +978,586 @@ async def debug_chat_context(request: Dict[str, Any]) -> Dict[str, Any]:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# Bill Checker Endpoints
+@app.post("/bill-checker/upload")
+async def upload_medical_bill(file: UploadFile = File(...)):
+    """Upload medical bill for analysis"""
+    try:
+        # Validate file type
+        allowed_types = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg', 'image/png']
+        if file.content_type not in allowed_types:
+            raise HTTPException(status_code=400, detail=f"Unsupported file type: {file.content_type}")
+        
+        # Read file content
+        content = await file.read()
+        
+        # Store bill file using the document processor (like policy uploads)
+        rag_result = await document_processor.process_uploaded_file(
+            file_data=content,
+            filename=file.filename or "medical_bill",
+            mime_type=file.content_type,
+            document_type="bill"  # Mark as bill document
+        )
+        
+        bill_id = str(rag_result["document_id"])
+        logger.info(f"💾 Stored bill document: {file.filename} with ID: {bill_id}")
+        
+        return {
+            "success": True,
+            "bill_id": bill_id,
+            "filename": file.filename,
+            "file_size": len(content),
+            "upload_timestamp": datetime.now().isoformat(),
+            "message": f"Successfully uploaded medical bill: {file.filename}"
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Bill upload failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+@app.post("/bill-checker/analyze")
+async def analyze_medical_bill(request: dict):
+    """Analyze medical bill against insurance policy using real AI"""
+    start_time = time.time()
+    
+    try:
+        bill_id = request.get("bill_id")
+        policy_id = request.get("policy_id")
+        
+        if not bill_id:
+            raise HTTPException(status_code=400, detail="Bill ID required")
+        
+        logger.info(f"🔍 Starting bill analysis: bill_id={bill_id}, policy_id={policy_id}")
+        
+        # Get bill and policy documents from database
+        from database import get_db_connection
+        conn = get_db_connection()
+        
+        try:
+            cursor = conn.cursor()
+            
+            # Get bill document
+            cursor.execute("""
+                SELECT id, filename, file_path, extracted_text 
+                FROM documents 
+                WHERE id = ?
+            """, (bill_id,))
+            bill_doc = cursor.fetchone()
+            
+            if not bill_doc:
+                raise HTTPException(status_code=404, detail=f"Bill document {bill_id} not found")
+            
+            # Get most recent policy document if policy_id not provided
+            if policy_id:
+                cursor.execute("""
+                    SELECT id, filename, file_path, extracted_text 
+                    FROM documents 
+                    WHERE id = ?
+                """, (policy_id,))
+            else:
+                # Get most recent policy from RAG documents table or fall back to policies table
+                cursor.execute("""
+                    SELECT id, filename, file_path, extracted_text 
+                    FROM documents 
+                    WHERE document_type = 'policy' OR document_type IS NULL
+                    ORDER BY upload_timestamp DESC 
+                    LIMIT 1
+                """)
+            
+            policy_doc = cursor.fetchone()
+            
+            if not policy_doc:
+                # Fallback: try to get policy data from policies table
+                cursor.execute("""
+                    SELECT summary_json FROM policies 
+                    ORDER BY id DESC LIMIT 1
+                """)
+                policy_result = cursor.fetchone()
+                if policy_result:
+                    policy_data = json.loads(policy_result[0])
+                    logger.info("📋 Using policy data from policies table")
+                else:
+                    logger.warning("⚠️ No policy document found for comparison")
+                    policy_data = None
+            else:
+                logger.info(f"📄 Found policy document: {policy_doc[1]}")
+                policy_data = {"extracted_text": policy_doc[3]}
+            
+        finally:
+            conn.close()
+        
+        # Perform AI analysis using existing Genkit infrastructure
+        if not ai_available:
+            logger.warning("AI not available, returning structured mock data")
+            analysis_result = create_mock_bill_analysis(bill_id)
+        else:
+            logger.info(f"🤖 Using REAL AI analysis with Gemini 2.5 Pro for bill {bill_id}")
+            # Use real AI analysis
+            analysis_result = await perform_real_bill_analysis(
+                bill_doc, policy_data, include_dispute_recommendations=True
+            )
+        
+        # Store analysis in bill_analyses table
+        analysis_id = f"analysis_{int(time.time())}_{bill_id}"
+        await store_bill_analysis(analysis_id, bill_id, policy_id, analysis_result)
+        
+        processing_time = int((time.time() - start_time) * 1000)
+        analysis_result["processing_time_ms"] = processing_time
+        analysis_result["analysis_id"] = analysis_id
+        
+        logger.info(f"✅ Bill analysis completed in {processing_time}ms")
+        return analysis_result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Bill analysis failed: {e}")
+        logger.exception("Full error traceback:")
+        raise HTTPException(status_code=500, detail=f"Analysis failed: {str(e)}")
+
+async def perform_real_bill_analysis(bill_doc, policy_data, include_dispute_recommendations=True):
+    """Perform real AI analysis of bill against policy"""
+    try:
+        # Build comprehensive analysis prompt
+        bill_text = bill_doc[3] if bill_doc[3] else "Bill text not extracted"
+        policy_text = ""
+        
+        if policy_data:
+            if isinstance(policy_data, dict):
+                if "extracted_text" in policy_data:
+                    policy_text = policy_data["extracted_text"]
+                else:
+                    # From policies table - extract key info
+                    policy_text = f"""
+                    Policy Summary:
+                    Deductible: {policy_data.get('deductible', 'Not specified')}
+                    Out-of-Pocket Max: {policy_data.get('out_of_pocket_max', 'Not specified')}
+                    Copay: {policy_data.get('copay', 'Not specified')}
+                    """
+        
+        analysis_prompt = f"""
+You are an expert medical billing and insurance analyst. Analyze this medical bill against the patient's insurance policy and provide a detailed breakdown in the exact JSON format specified below.
+
+MEDICAL BILL:
+{bill_text}
+
+INSURANCE POLICY:
+{policy_text}
+
+You must respond with a valid JSON object that matches this exact structure:
+
+{{
+  "billSummary": {{
+    "patientName": "extracted from bill",
+    "memberId": "extracted from bill if available",
+    "groupName": "extracted from bill if available", 
+    "dateOfService": "YYYY-MM-DD format",
+    "provider": {{
+      "name": "provider name from bill",
+      "status": "In-Network" or "Out-of-Network"
+    }},
+    "totals": {{
+      "providerBilled": 0.00,
+      "planPaid": 0.00,
+      "amountSaved": 0.00,
+      "patientOwed": 0.00
+    }},
+    "serviceDetails": [
+      {{
+        "serviceDescription": "description of service",
+        "serviceCode": "CPT code if available",
+        "providerBilled": 0.00,
+        "amountSaved": 0.00,
+        "planAllowed": 0.00,
+        "planPaid": 0.00,
+        "appliedToDeductible": 0.00,
+        "copay": 0.00,
+        "coinsurance": 0.00,
+        "planDoesNotCover": 0.00,
+        "patientOwed": 0.00,
+        "notes": "explanation of calculation and policy application"
+      }}
+    ]
+  }},
+  "coverageAnalysis": {{
+    "summary": "brief summary of coverage",
+    "networkStatus": "explanation of in/out network status",
+    "benefitsApplied": "which benefits from policy were applied",
+    "deductibleStatus": "current deductible status and remaining amount"
+  }},
+  "discrepancyCheck": {{
+    "hasDiscrepancies": true/false,
+    "findings": "detailed analysis of any billing errors or policy misapplications",
+    "recommendations": "specific actions patient should take if any issues found"
+  }}
+}}
+
+CRITICAL INSTRUCTIONS:
+1. Extract exact dollar amounts from the bill
+2. Use the policy details to calculate correct coverage
+3. Show detailed line-by-line service breakdown
+4. Calculate deductibles, copays, and coinsurance according to the policy
+5. Identify any billing errors or policy misapplications
+6. Return ONLY the JSON object, no other text
+7. Ensure all dollar amounts are accurate to the cent
+8. Include notes explaining each calculation
+"""
+
+        # Use existing Genkit AI infrastructure with Gemini 2.5 Pro
+        from ai.flows.policy_analysis import analyze_insurance_policy
+        from ai.schemas import PolicyAnalysisInput, DocumentType
+        
+        # Use Gemini 2.5 Pro for complex bill analysis
+        model = ai_config.get_model('pro')  # Use Pro model for better analysis
+        
+        if not model:
+            logger.error("❌ Failed to get Gemini Pro model - falling back to mock")
+            return create_mock_bill_analysis("model_unavailable")
+        
+        logger.info("🤖 Generating AI bill analysis with Gemini 2.5 Pro...")
+        logger.info(f"📝 Prompt length: {len(analysis_prompt)} characters")
+        logger.info(f"📄 Bill text length: {len(bill_text)} characters")
+        logger.info(f"📋 Policy text length: {len(policy_text)} characters")
+        
+        try:
+            response = model.generate_content(analysis_prompt)
+            analysis_text = response.text
+            logger.info(f"✅ Received AI response: {len(analysis_text)} characters")
+            logger.info(f"🔍 Response preview: {analysis_text[:200]}...")
+        except Exception as api_error:
+            logger.error(f"❌ Gemini API call failed: {api_error}")
+            raise
+        
+        # Parse JSON response directly
+        structured_analysis = parse_json_bill_analysis(analysis_text)
+        
+        return structured_analysis
+        
+    except Exception as e:
+        logger.error(f"❌ Real AI analysis failed: {e}")
+        # Fallback to mock analysis
+        return create_mock_bill_analysis("unknown")
+
+def parse_json_bill_analysis(analysis_text: str) -> dict:
+    """Parse JSON response from AI into frontend-compatible format"""
+    
+    try:
+        # Clean the response text to extract JSON
+        import re
+        
+        # Find JSON object in response
+        json_match = re.search(r'\{.*\}', analysis_text, re.DOTALL)
+        if json_match:
+            json_str = json_match.group(0)
+            ai_analysis = json.loads(json_str)
+            
+            # Convert to frontend-compatible format
+            bill_summary = ai_analysis.get("billSummary", {})
+            totals = bill_summary.get("totals", {})
+            provider = bill_summary.get("provider", {})
+            coverage = ai_analysis.get("coverageAnalysis", {})
+            discrepancy = ai_analysis.get("discrepancyCheck", {})
+            
+            return {
+                "bill_summary": {
+                    "provider_name": provider.get("name", "Provider not found"),
+                    "patient_name": bill_summary.get("patientName", ""),
+                    "member_id": bill_summary.get("memberId", ""),
+                    "date_of_service": bill_summary.get("dateOfService", ""),
+                    "services_provided": [detail.get("serviceDescription", "") for detail in bill_summary.get("serviceDetails", [])]
+                },
+                "coverage_analysis": {
+                    "network_status": provider.get("status", "Unknown"),
+                    "covered_services": [detail.get("serviceDescription", "") for detail in bill_summary.get("serviceDetails", [])],
+                    "summary": coverage.get("summary", ""),
+                    "benefits_applied": coverage.get("benefitsApplied", ""),
+                    "deductible_status": coverage.get("deductibleStatus", "")
+                },
+                "financial_breakdown": {
+                    "total_charges": totals.get("providerBilled", 0.0),
+                    "insurance_payment": totals.get("planPaid", 0.0),
+                    "patient_responsibility": totals.get("patientOwed", 0.0),
+                    "amount_saved": totals.get("amountSaved", 0.0)
+                },
+                "service_details": bill_summary.get("serviceDetails", []),
+                "dispute_recommendations": [
+                    {
+                        "issue_type": "Discrepancy Analysis",
+                        "description": discrepancy.get("findings", ""),
+                        "recommended_action": discrepancy.get("recommendations", ""),
+                        "priority": "high" if discrepancy.get("hasDiscrepancies", False) else "low"
+                    }
+                ] if discrepancy.get("findings") else [],
+                "discrepancy_check": discrepancy.get("findings", "No discrepancies found."),
+                "confidence_score": 0.95,
+                "full_analysis": ai_analysis,
+                "raw_ai_response": analysis_text
+            }
+        else:
+            logger.error("No JSON found in AI response")
+            return create_fallback_analysis(analysis_text)
+            
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse JSON response: {e}")
+        return create_fallback_analysis(analysis_text)
+    except Exception as e:
+        logger.error(f"Error parsing AI analysis: {e}")
+        return create_fallback_analysis(analysis_text)
+
+def create_fallback_analysis(analysis_text: str) -> dict:
+    """Create fallback analysis when JSON parsing fails"""
+    
+    # Extract dollar amounts as fallback
+    import re
+    dollar_amounts = re.findall(r'\$[\d,]+\.?\d*', analysis_text)
+    
+    total_charges = 0.0
+    patient_responsibility = 0.0
+    insurance_payment = 0.0
+    
+    if len(dollar_amounts) >= 1:
+        total_charges = float(dollar_amounts[0].replace('$', '').replace(',', ''))
+    if len(dollar_amounts) >= 2:
+        patient_responsibility = float(dollar_amounts[1].replace('$', '').replace(',', ''))
+    if len(dollar_amounts) >= 3:
+        insurance_payment = float(dollar_amounts[2].replace('$', '').replace(',', ''))
+    
+    return {
+        "bill_summary": {
+            "provider_name": extract_provider_name(analysis_text),
+            "services_provided": extract_services(analysis_text)
+        },
+        "coverage_analysis": {
+            "covered_services": extract_covered_services(analysis_text)
+        },
+        "financial_breakdown": {
+            "total_charges": total_charges,
+            "insurance_payment": insurance_payment,
+            "patient_responsibility": patient_responsibility
+        },
+        "dispute_recommendations": extract_disputes(analysis_text),
+        "confidence_score": 0.75,
+        "full_analysis": analysis_text,
+        "note": "Fallback parsing used - JSON response was malformed"
+    }
+
+def extract_provider_name(text: str) -> str:
+    """Extract provider name from analysis text"""
+    # Simple keyword search - could be improved with NLP
+    lines = text.split('\n')
+    for line in lines:
+        if 'provider' in line.lower() and ':' in line:
+            return line.split(':')[-1].strip()
+    return "Provider information in full analysis"
+
+def extract_services(text: str) -> list:
+    """Extract services from analysis text"""
+    # Look for services/procedures section
+    services = []
+    lines = text.split('\n')
+    in_services_section = False
+    
+    for line in lines:
+        if 'service' in line.lower() or 'procedure' in line.lower():
+            in_services_section = True
+        elif in_services_section and line.strip().startswith('-'):
+            services.append(line.strip()[1:].strip())
+        elif in_services_section and line.strip() == '':
+            break
+    
+    return services if services else ["See full analysis below"]
+
+def extract_covered_services(text: str) -> list:
+    """Extract covered services from analysis text"""
+    # Similar to extract_services but looking for coverage info
+    covered = []
+    lines = text.split('\n')
+    
+    for line in lines:
+        if 'covered' in line.lower() and 'not covered' not in line.lower():
+            if ':' in line:
+                covered.append(line.split(':')[-1].strip())
+    
+    return covered if covered else ["Coverage details in full analysis"]
+
+def extract_disputes(text: str) -> list:
+    """Extract dispute recommendations from analysis text"""
+    disputes = []
+    lines = text.split('\n')
+    in_dispute_section = False
+    
+    for line in lines:
+        if 'dispute' in line.lower() or 'error' in line.lower() or 'questionable' in line.lower():
+            in_dispute_section = True
+        elif in_dispute_section and line.strip().startswith('-'):
+            disputes.append({
+                "issue_type": "Billing Issue",
+                "description": line.strip()[1:].strip(),
+                "recommended_action": "Review with provider",
+                "priority": "medium"
+            })
+        elif in_dispute_section and line.strip() == '':
+            break
+    
+    return disputes
+
+def create_mock_bill_analysis(bill_id: str) -> dict:
+    """Create mock analysis when AI is not available"""
+    logger.warning(f"🚨 RETURNING MOCK DATA for bill {bill_id} - Configure GEMINI_API_KEY for real analysis")
+    return {
+        "bill_summary": {
+            "provider_name": "🤖 MOCK DATA - SAMPLE MEDICAL CENTER",
+            "patient_name": "🤖 MOCK DATA - SAMPLE PATIENT",
+            "member_id": "123456789",
+            "date_of_service": "2024-01-15",
+            "services_provided": ["🤖 MOCK: Office Visit", "🤖 MOCK: Lab Test", "🤖 MOCK: Medical Procedure"]
+        },
+        "coverage_analysis": {
+            "network_status": "In-Network",
+            "covered_services": ["Office Visit - Covered", "Lab Test - Covered", "Procedure - Partially Covered"],
+            "summary": "Most services covered under standard benefits",
+            "benefits_applied": "Standard copays and coinsurance applied",
+            "deductible_status": "Annual deductible partially met"
+        },
+        "financial_breakdown": {
+            "total_charges": 425.00,
+            "insurance_payment": 340.00,
+            "patient_responsibility": 85.00,
+            "amount_saved": 255.00
+        },
+        "service_details": [
+            {
+                "serviceDescription": "Office Visit",
+                "serviceCode": "99213",
+                "providerBilled": 150.00,
+                "planPaid": 125.00,
+                "patientOwed": 25.00,
+                "copay": 25.00,
+                "notes": "Standard office visit copay applied"
+            },
+            {
+                "serviceDescription": "Lab Test",
+                "serviceCode": "80053",
+                "providerBilled": 75.00,
+                "planPaid": 60.00,
+                "patientOwed": 15.00,
+                "coinsurance": 15.00,
+                "notes": "20% coinsurance after deductible met"
+            }
+        ],
+        "dispute_recommendations": [
+            {
+                "issue_type": "Configuration Required",
+                "description": "Configure GEMINI_API_KEY for real bill analysis with Gemini 2.5 Pro",
+                "recommended_action": "Set up AI integration for detailed analysis",
+                "priority": "high"
+            }
+        ],
+        "discrepancy_check": "Mock analysis mode - configure GEMINI_API_KEY for real discrepancy detection",
+        "confidence_score": 0.5,
+        "full_analysis": {
+            "billSummary": {
+                "patientName": "SAMPLE PATIENT",
+                "provider": {"name": "SAMPLE MEDICAL CENTER", "status": "In-Network"},
+                "totals": {"providerBilled": 425.00, "planPaid": 340.00, "patientOwed": 85.00}
+            }
+        },
+        "note": "Mock analysis - configure GEMINI_API_KEY environment variable for real AI-powered bill analysis"
+    }
+
+async def store_bill_analysis(analysis_id: str, bill_id: str, policy_id: str, analysis_result: dict):
+    """Store bill analysis results in database"""
+    try:
+        from database import get_db_connection
+        conn = get_db_connection()
+        
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO bill_analyses (
+                    id, bill_document_id, policy_document_id, 
+                    analysis_result, analysis_summary, 
+                    patient_responsibility, insurance_payment, total_charges,
+                    confidence_score
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                analysis_id,
+                bill_id,
+                policy_id,
+                json.dumps(analysis_result),
+                json.dumps(analysis_result.get("bill_summary", {})),
+                analysis_result.get("financial_breakdown", {}).get("patient_responsibility", 0.0),
+                analysis_result.get("financial_breakdown", {}).get("insurance_payment", 0.0),
+                analysis_result.get("financial_breakdown", {}).get("total_charges", 0.0),
+                analysis_result.get("confidence_score", 0.0)
+            ))
+            
+            conn.commit()
+            logger.info(f"💾 Stored bill analysis: {analysis_id}")
+            
+        finally:
+            conn.close()
+            
+    except Exception as e:
+        logger.error(f"❌ Failed to store bill analysis: {e}")
+
+@app.get("/bill-checker/history")
+async def get_bill_analysis_history(limit: int = 10):
+    """Get history of bill analyses"""
+    try:
+        from database import get_db_connection
+        conn = get_db_connection()
+        
+        try:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT 
+                    ba.id as analysis_id,
+                    d.filename as bill_filename,
+                    ba.created_at as analysis_date,
+                    ba.patient_responsibility,
+                    ba.confidence_score,
+                    ba.total_charges,
+                    ba.insurance_payment
+                FROM bill_analyses ba
+                LEFT JOIN documents d ON ba.bill_document_id = d.id
+                ORDER BY ba.created_at DESC
+                LIMIT ?
+            """, (limit,))
+            
+            analyses = []
+            for row in cursor.fetchall():
+                analyses.append({
+                    "analysis_id": row[0],
+                    "bill_filename": row[1] or "Unknown",
+                    "analysis_date": row[2],
+                    "patient_responsibility": row[3] or 0.0,
+                    "confidence_score": row[4] or 0.0,
+                    "total_charges": row[5] or 0.0,
+                    "insurance_payment": row[6] or 0.0
+                })
+            
+            return {
+                "analyses": analyses,
+                "total_count": len(analyses)
+            }
+            
+        finally:
+            conn.close()
+            
+    except Exception as e:
+        logger.error(f"❌ Error getting bill history: {e}")
+        return {
+            "analyses": [],
+            "total_count": 0,
+            "error": str(e)
+        }
+
 if __name__ == "__main__":
     import uvicorn
     
     # Start the Genkit development server for enhanced debugging
-    logger.info("Starting HEAL API with Genkit integration")
+    logger.info("Starting HEAL API with Genkit integration + Bill Checker")
     logger.info("Visit http://localhost:8000/docs for API documentation")
     logger.info("Use 'genkit start -- python main.py' for Genkit Developer UI")
     

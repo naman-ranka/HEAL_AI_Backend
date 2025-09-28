@@ -59,7 +59,8 @@ class DocumentProcessor:
         self, 
         file_data: bytes, 
         filename: str, 
-        mime_type: str
+        mime_type: str,
+        document_type: str = "policy"
     ) -> Dict[str, Any]:
         """
         Process uploaded file and store in RAG system
@@ -68,6 +69,7 @@ class DocumentProcessor:
             file_data: Raw file bytes
             filename: Original filename
             mime_type: MIME type of file
+            document_type: Type of document ("policy", "bill", etc.)
             
         Returns:
             Processing result with document ID and stats
@@ -94,7 +96,8 @@ class DocumentProcessor:
                 file_path=str(file_path),
                 original_name=filename,
                 file_size=len(file_data),
-                mime_type=mime_type
+                mime_type=mime_type,
+                document_type=document_type
             )
             
             # Extract text based on file type
@@ -334,7 +337,8 @@ class DocumentProcessor:
         file_path: str, 
         original_name: str,
         file_size: int,
-        mime_type: str
+        mime_type: str,
+        document_type: str = "policy"
     ) -> int:
         """Store document metadata in database"""
         conn = get_db_connection()
@@ -342,9 +346,9 @@ class DocumentProcessor:
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO documents (
-                    filename, file_path, original_name, file_size, mime_type
-                ) VALUES (?, ?, ?, ?, ?)
-            """, (filename, file_path, original_name, file_size, mime_type))
+                    filename, file_path, original_name, file_size, mime_type, document_type
+                ) VALUES (?, ?, ?, ?, ?, ?)
+            """, (filename, file_path, original_name, file_size, mime_type, document_type))
             
             document_id = cursor.lastrowid
             conn.commit()

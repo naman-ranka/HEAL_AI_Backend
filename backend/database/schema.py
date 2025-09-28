@@ -54,6 +54,25 @@ def create_rag_tables(db_path: str = "heal.db"):
             )
         """)
         
+        # Bill analyses table for tracking bill checker results
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS bill_analyses (
+                id TEXT PRIMARY KEY,
+                bill_document_id INTEGER NOT NULL,
+                policy_document_id INTEGER,
+                analysis_result TEXT NOT NULL,
+                analysis_summary TEXT,
+                patient_responsibility REAL,
+                insurance_payment REAL,
+                total_charges REAL,
+                potential_disputes TEXT,
+                confidence_score REAL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (bill_document_id) REFERENCES documents(id),
+                FOREIGN KEY (policy_document_id) REFERENCES documents(id)
+            )
+        """)
+
         # Chat sessions table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS chat_sessions (

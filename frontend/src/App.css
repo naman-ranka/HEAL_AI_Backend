@@ -77,6 +77,97 @@ body {
   transform: translateY(0);
 }
 
+/* Button Group for Multiple Options */
+.button-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  align-items: center;
+}
+
+.upload-button.primary {
+  background-color: var(--primary-soft-blue);
+}
+
+.upload-button.secondary {
+  background-color: var(--success-gentle-green);
+  color: var(--text-dark-charcoal);
+}
+
+.upload-button.secondary:hover {
+  background-color: #45D4B5;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(80, 227, 194, 0.4);
+}
+
+/* Bill History */
+.bill-history-toggle {
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(74, 74, 74, 0.1);
+}
+
+.history-button {
+  background: none;
+  border: 1px solid var(--primary-soft-blue);
+  color: var(--primary-soft-blue);
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  transition: all 0.3s ease;
+}
+
+.history-button:hover {
+  background-color: var(--primary-soft-blue);
+  color: white;
+}
+
+.bill-history {
+  margin-top: 1rem;
+  background: white;
+  border-radius: 8px;
+  padding: 1rem;
+  box-shadow: 0 2px 8px var(--shadow-light);
+}
+
+.bill-history h3 {
+  margin-bottom: 0.75rem;
+  color: var(--text-dark-charcoal);
+  font-size: 1rem;
+}
+
+.history-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 0.9rem;
+}
+
+.history-item:last-child {
+  border-bottom: none;
+}
+
+.bill-name {
+  font-weight: 500;
+  color: var(--text-dark-charcoal);
+  flex: 1;
+  text-align: left;
+}
+
+.bill-date {
+  color: #666;
+  font-size: 0.8rem;
+  margin: 0 0.5rem;
+}
+
+.patient-cost {
+  font-weight: 600;
+  color: var(--primary-soft-blue);
+}
+
 /* Loading State */
 .loading-state {
   display: flex;
@@ -223,6 +314,28 @@ body {
 .chat-button:hover {
   background-color: #3DD5B3;
   transform: translateY(-1px);
+}
+
+/* Bill Checker Button in Results */
+.bill-checker-button {
+  width: 100%;
+  background-color: var(--primary-soft-blue);
+  color: var(--white);
+  border: none;
+  padding: 1rem 2rem;
+  font-size: 1rem;
+  font-weight: 500;
+  font-family: 'Inter', sans-serif;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
+}
+
+.bill-checker-button:hover {
+  background-color: #3A7BC8;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(74, 144, 226, 0.4);
 }
 
 /* Buttons */
@@ -630,4 +743,273 @@ body {
   .suggestion {
     text-align: center;
   }
+}
+
+/* Bill Analysis Specific Styles */
+.bill-analysis-card {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.analysis-context {
+  background: var(--success-gentle-green);
+  color: var(--text-dark-charcoal);
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  text-align: center;
+  font-weight: 500;
+}
+
+.bill-analysis {
+  text-align: left;
+}
+
+.analysis-section {
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  background: #f9f9f9;
+  border-radius: 12px;
+  border-left: 4px solid var(--primary-soft-blue);
+}
+
+.analysis-section h3 {
+  color: var(--text-dark-charcoal);
+  margin-bottom: 1rem;
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.analysis-section h4 {
+  color: var(--text-dark-charcoal);
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+  font-weight: 500;
+}
+
+.coverage-info ul {
+  list-style: none;
+  padding: 0;
+}
+
+.coverage-info li {
+  padding: 0.25rem 0;
+  padding-left: 1.5rem;
+  position: relative;
+}
+
+.coverage-info li:before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--success-gentle-green);
+  font-weight: bold;
+}
+
+.disputes {
+  border-left-color: #ff6b6b;
+}
+
+.dispute-item {
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #f0f0f0;
+}
+
+.dispute-item.high {
+  border-left: 4px solid #ff6b6b;
+}
+
+.dispute-item.medium {
+  border-left: 4px solid #ffa726;
+}
+
+.dispute-item.low {
+  border-left: 4px solid #66bb6a;
+}
+
+.dispute-item strong {
+  color: var(--text-dark-charcoal);
+  font-size: 1.1rem;
+  display: block;
+  margin-bottom: 0.5rem;
+}
+
+.dispute-item p {
+  margin-bottom: 0.5rem;
+  line-height: 1.5;
+}
+
+.dispute-item em {
+  color: var(--primary-soft-blue);
+  font-style: normal;
+  font-weight: 500;
+}
+
+.raw-analysis {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 1rem;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.raw-analysis pre {
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  margin: 0;
+  color: var(--text-dark-charcoal);
+}
+
+.confidence-info {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2rem;
+  padding: 1rem;
+  background: var(--bg-light-gray);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.summary-item .value.highlight {
+  color: var(--primary-soft-blue);
+  font-weight: 700;
+  font-size: 1.1em;
+}
+
+/* Enhanced Bill Analysis Styles */
+.financial-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.financial-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.financial-item.total {
+  background: #f8f9fa;
+  border-left: 4px solid #3498db;
+}
+
+.financial-item.patient {
+  background: #fff3cd;
+  border-left: 4px solid #ffc107;
+}
+
+.financial-item.insurance {
+  background: #d1ecf1;
+  border-left: 4px solid #17a2b8;
+}
+
+.financial-item.savings {
+  background: #d4edda;
+  border-left: 4px solid #28a745;
+}
+
+.financial-item .label {
+  font-size: 14px;
+  color: #666;
+}
+
+.financial-item .value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.financial-item .value.highlight {
+  color: #e74c3c !important;
+  font-size: 20px;
+}
+
+/* Service Details */
+.service-details {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.service-item {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 16px;
+  background: #fafafa;
+}
+
+.service-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.service-code {
+  color: #666;
+  font-size: 14px;
+  font-weight: normal;
+}
+
+.service-amounts {
+  display: flex;
+  gap: 16px;
+  margin: 8px 0;
+  font-size: 14px;
+  flex-wrap: wrap;
+}
+
+.service-amounts span {
+  padding: 4px 8px;
+  background: #e9ecef;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.service-notes {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #e8f4f8;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #2c3e50;
+  font-style: italic;
+}
+
+/* Coverage Details */
+.coverage-details {
+  line-height: 1.6;
+}
+
+.coverage-details p {
+  margin: 8px 0;
+}
+
+.coverage-details strong {
+  color: #2c3e50;
+}
+
+/* Discrepancy Section */
+.analysis-section.discrepancy {
+  border-left: 4px solid #e74c3c !important;
+  background: #fdf2f2;
+}
+
+.discrepancy-content {
+  padding: 12px;
+  background: white;
+  border-radius: 6px;
+  margin-top: 8px;
 }
