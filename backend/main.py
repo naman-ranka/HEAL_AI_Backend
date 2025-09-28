@@ -7,6 +7,7 @@ import os
 import logging
 import base64
 import time
+import shutil
 from datetime import datetime
 from typing import Dict, Any, List
 from dotenv import load_dotenv
@@ -44,9 +45,14 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # React dev server
+    allow_origins=[
+        "http://localhost:3000",  # Original React dev server
+        "http://localhost:5173",  # Vite dev server (frontend-final)
+        "http://localhost:4173",  # Vite preview server
+        "http://localhost:8080",  # Frontend running on port 8080
+    ],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -1553,12 +1559,277 @@ async def get_bill_analysis_history(limit: int = 10):
             "error": str(e)
         }
 
+# ============================================================================
+# ADMIN ENDPOINTS - Database Reset & Management
+# ============================================================================
+
+@app.delete("/admin/reset-all")
+async def reset_all_data(confirm: str = None):
+    """
+    DANGER: Reset all database data and uploaded files
+    
+    This endpoint clears:
+    - All uploaded documents and files
+    - All document chunks and embeddings
+    - All chat sessions and history
+    - All policy analyses
+    - All bill analyses
+    - All uploaded files in storage
+    
+    Requires explicit confirmation and development environment
+    """
+    # Security checks
+    environment = os.getenv("ENVIRONMENT", "development").lower()
+    if environment == "production":
+        raise HTTPException(
+            status_code=403, 
+            detail="Database reset is not allowed in production environment"
+        )
+    
+    if confirm != "CONFIRM_RESET":
+        raise HTTPException(
+            status_code=400,
+            detail="Must provide confirmation parameter: ?confirm=CONFIRM_RESET"
+        )
+    
+    try:
+        reset_result = await perform_complete_reset()
+        logger.warning("🔥 COMPLETE DATABASE RESET PERFORMED 🔥")
+        return {
+            "status": "success",
+            "message": "All data has been reset successfully",
+            "environment": environment,
+            "reset_details": reset_result,
+            "timestamp": datetime.now().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Database reset failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Reset failed: {str(e)}")
+
+
+@app.get("/admin/database-info")
+async def get_database_info():
+    """Get current database statistics"""
+    try:
+        stats = await get_database_stats()
+        return {
+            "status": "success",
+            "database_stats": stats,
+            "environment": os.getenv("ENVIRONMENT", "development"),
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Error getting database info: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/admin/cleanup-embeddings")
+async def cleanup_mismatched_embeddings():
+    """Clean up chunks with mismatched embedding dimensions"""
+    try:
+        result = await cleanup_embedding_dimensions()
+        return {
+            "status": "success",
+            "cleanup_result": result,
+            "timestamp": datetime.now().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Error cleaning up embeddings: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def perform_complete_reset() -> Dict[str, Any]:
+    """Perform complete database and file system reset"""
+    reset_stats = {
+        "documents_deleted": 0,
+        "chunks_deleted": 0,
+        "chat_sessions_deleted": 0,
+        "policies_deleted": 0,
+        "bill_analyses_deleted": 0,
+        "files_deleted": 0,
+        "directories_cleaned": []
+    }
+    
+    from database import get_db_connection
+    conn = get_db_connection()
+    
+    try:
+        cursor = conn.cursor()
+        
+        # Get counts before deletion
+        cursor.execute("SELECT COUNT(*) FROM documents")
+        reset_stats["documents_deleted"] = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM document_chunks")
+        reset_stats["chunks_deleted"] = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM chat_sessions")
+        reset_stats["chat_sessions_deleted"] = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM policies")
+        reset_stats["policies_deleted"] = cursor.fetchone()[0]
+        
+        cursor.execute("SELECT COUNT(*) FROM bill_analyses")
+        reset_stats["bill_analyses_deleted"] = cursor.fetchone()[0]
+        
+        # Delete all data from tables (order matters for foreign keys)
+        tables_to_clear = [
+            "chat_messages",
+            "chat_sessions", 
+            "bill_analyses",
+            "document_chunks",
+            "documents",
+            "policies"
+        ]
+        
+        for table in tables_to_clear:
+            try:
+                cursor.execute(f"DELETE FROM {table}")
+                logger.info(f"✅ Cleared table: {table}")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not clear table {table}: {e}")
+        
+        # Reset auto-increment counters
+        for table in tables_to_clear:
+            try:
+                cursor.execute(f"DELETE FROM sqlite_sequence WHERE name='{table}'")
+            except Exception as e:
+                logger.warning(f"⚠️ Could not reset sequence for {table}: {e}")
+        
+        conn.commit()
+        
+        # Clean up uploaded files
+        uploads_dir = "uploads"
+        if os.path.exists(uploads_dir):
+            file_count = sum(len(files) for _, _, files in os.walk(uploads_dir))
+            reset_stats["files_deleted"] = file_count
+            shutil.rmtree(uploads_dir)
+            os.makedirs(uploads_dir, exist_ok=True)
+            reset_stats["directories_cleaned"].append(uploads_dir)
+            logger.info(f"✅ Cleaned uploads directory: {file_count} files deleted")
+        
+        # Clean up any temp directories
+        temp_dirs = ["temp", "tmp", ".temp"]
+        for temp_dir in temp_dirs:
+            if os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir)
+                reset_stats["directories_cleaned"].append(temp_dir)
+                logger.info(f"✅ Cleaned temp directory: {temp_dir}")
+        
+        return reset_stats
+        
+    finally:
+        conn.close()
+
+
+async def get_database_stats() -> Dict[str, Any]:
+    """Get current database statistics"""
+    from database import get_db_connection
+    conn = get_db_connection()
+    
+    try:
+        cursor = conn.cursor()
+        stats = {}
+        
+        # Table counts
+        tables = ["documents", "document_chunks", "chat_sessions", "chat_messages", "policies", "bill_analyses"]
+        for table in tables:
+            try:
+                cursor.execute(f"SELECT COUNT(*) FROM {table}")
+                stats[f"{table}_count"] = cursor.fetchone()[0]
+            except Exception:
+                stats[f"{table}_count"] = "N/A"
+        
+        # File system stats
+        uploads_dir = "uploads"
+        if os.path.exists(uploads_dir):
+            file_count = sum(len(files) for _, _, files in os.walk(uploads_dir))
+            total_size = sum(
+                os.path.getsize(os.path.join(dirpath, filename))
+                for dirpath, dirnames, filenames in os.walk(uploads_dir)
+                for filename in filenames
+            )
+            stats["uploaded_files_count"] = file_count
+            stats["uploaded_files_size_mb"] = round(total_size / (1024 * 1024), 2)
+        else:
+            stats["uploaded_files_count"] = 0
+            stats["uploaded_files_size_mb"] = 0
+        
+        # Embedding dimension analysis
+        cursor.execute("""
+            SELECT 
+                CASE 
+                    WHEN embedding IS NULL THEN 'No embedding'
+                    WHEN length(embedding) = 1536 THEN '384 dimensions'  -- 384 * 4 bytes
+                    WHEN length(embedding) = 3072 THEN '768 dimensions'  -- 768 * 4 bytes
+                    ELSE 'Other: ' || length(embedding) || ' bytes'
+                END as embedding_type,
+                COUNT(*) as count
+            FROM document_chunks 
+            GROUP BY embedding_type
+        """)
+        
+        embedding_stats = {}
+        for row in cursor.fetchall():
+            embedding_stats[row[0]] = row[1]
+        
+        stats["embedding_dimensions"] = embedding_stats
+        
+        return stats
+        
+    finally:
+        conn.close()
+
+
+async def cleanup_embedding_dimensions() -> Dict[str, Any]:
+    """Remove chunks with mismatched embedding dimensions"""
+    from database import get_db_connection
+    conn = get_db_connection()
+    
+    try:
+        cursor = conn.cursor()
+        
+        # Find chunks with non-768 dimension embeddings
+        cursor.execute("""
+            SELECT id, length(embedding) as embedding_size
+            FROM document_chunks 
+            WHERE embedding IS NOT NULL 
+            AND length(embedding) != 3072  -- 768 dimensions * 4 bytes
+        """)
+        
+        mismatched_chunks = cursor.fetchall()
+        mismatched_count = len(mismatched_chunks)
+        
+        if mismatched_count > 0:
+            # Delete mismatched chunks
+            cursor.execute("""
+                DELETE FROM document_chunks 
+                WHERE embedding IS NOT NULL 
+                AND length(embedding) != 3072
+            """)
+            conn.commit()
+            logger.info(f"🧹 Cleaned up {mismatched_count} chunks with mismatched embeddings")
+        
+        return {
+            "mismatched_chunks_removed": mismatched_count,
+            "chunks_details": [
+                {"chunk_id": chunk[0], "embedding_size_bytes": chunk[1]} 
+                for chunk in mismatched_chunks
+            ]
+        }
+        
+    finally:
+        conn.close()
+
+
 if __name__ == "__main__":
     import uvicorn
     
     # Start the Genkit development server for enhanced debugging
-    logger.info("Starting HEAL API with Genkit integration + Bill Checker")
+    logger.info("Starting HEAL API with Genkit integration + Bill Checker + Admin Tools")
     logger.info("Visit http://localhost:8000/docs for API documentation")
     logger.info("Use 'genkit start -- python main.py' for Genkit Developer UI")
+    logger.info("⚠️  Admin endpoints available at /admin/* (development only)")
     
     uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")

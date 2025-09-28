@@ -67,10 +67,13 @@ class RAGRetriever:
         
         try:
             # Generate query embedding
+            logger.info(f"🔍 RAG Query: '{query}' with document_ids={document_ids}")
             query_embedding = await self._generate_query_embedding(query)
+            logger.info(f"📊 Generated query embedding with shape: {query_embedding.shape}")
             
             # Get all chunk embeddings from database
             chunks_data = self._get_chunks_with_embeddings(document_ids)
+            logger.info(f"📚 Found {len(chunks_data)} chunks in database")
             
             if not chunks_data:
                 logger.warning("No chunks found in database")
@@ -82,12 +85,34 @@ class RAGRetriever:
                     query_embedding=query_embedding
                 )
             
-            # Calculate similarities
-            similarities = self._calculate_similarities(query_embedding, chunks_data)
+            # Filter chunks to only those with valid embeddings matching query dimensions
+            query_dim = query_embedding.shape[0]
+            valid_chunks = []
+            
+            for chunk in chunks_data:
+                embedding = chunk['embedding']
+                if embedding is not None and embedding.shape[0] == query_dim:
+                    valid_chunks.append(chunk)
+                else:
+                    logger.warning(f"❌ Skipping chunk {chunk.get('chunk_id', 'unknown')} - embedding shape mismatch: {embedding.shape if embedding is not None else 'None'} vs query {query_dim}")
+            
+            logger.info(f"✅ Using {len(valid_chunks)} valid chunks out of {len(chunks_data)} total")
+            
+            if not valid_chunks:
+                logger.warning("No chunks with matching embedding dimensions found")
+                return RetrievalResult(
+                    query=query,
+                    chunks=[],
+                    total_found=0,
+                    execution_time_ms=int((time.time() - start_time) * 1000)
+                )
+            
+            # Calculate similarities using only valid chunks
+            similarities = self._calculate_similarities(query_embedding, valid_chunks)
             
             # Filter and sort results
             relevant_chunks = []
-            for i, (chunk_data, similarity) in enumerate(zip(chunks_data, similarities)):
+            for i, (chunk_data, similarity) in enumerate(zip(valid_chunks, similarities)):
                 if similarity >= similarity_threshold:
                     relevant_chunks.append(RetrievedChunk(
                         chunk_id=chunk_data['chunk_id'],
@@ -240,7 +265,7 @@ class RAGRetriever:
         if not chunks_data:
             return np.array([])
         
-        # Stack all chunk embeddings
+        # Extract embeddings from pre-filtered chunks (already validated)
         chunk_embeddings = np.stack([chunk['embedding'] for chunk in chunks_data])
         
         # Calculate cosine similarities
