@@ -1,0 +1,51 @@
+# Genkit-style RAG Chat Requirements
+# Core dependencies for HEAL Genkit implementation
+
+# FastAPI and web framework
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+
+# Environment and configuration
+python-dotenv==1.0.0
+
+# Google AI and Genkit-style dependencies
+google-generativeai==0.4.0
+# genkit[python]==0.5.0  # Uncomment when Genkit Python is stable
+
+# Data validation and serialization
+pydantic==2.6.0
+
+# Document processing
+Pillow==10.2.0
+PyMuPDF==1.26.4
+pytesseract==0.3.10
+aiofiles==23.2.0
+
+# Vector operations and ML
+numpy==1.26.0
+scikit-learn==1.4.0
+
+# Database
+sqlite3  # Built into Python
+
+# HTTP requests for testing
+requests==2.31.0
+
+# Async support
+asyncio  # Built into Python
+
+# Logging and utilities
+pathlib  # Built into Python
+tempfile  # Built into Python
+uuid  # Built into Python
+json  # Built into Python
+time  # Built into Python
+datetime  # Built into Python
+dataclasses  # Built into Python
+
+# Optional: When full Genkit Python is available
+# firebase-admin>=6.0.0
+# google-cloud-firestore>=2.0.0
+# chromadb>=0.4.0
+# pinecone-client>=2.0.0

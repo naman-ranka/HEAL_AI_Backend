@@ -824,6 +824,160 @@ async def debug_test_gemini(request: Dict[str, str]) -> Dict[str, Any]:
         }
 
 
+@app.get("/debug/embeddings/stats")
+async def debug_embedding_stats() -> Dict[str, Any]:
+    """
+    Debug: Get embedding system statistics
+    """
+    try:
+        embedder = get_embedder()
+        stats = embedder.get_stats()
+        
+        return {
+            "embedding_stats": stats,
+            "api_available": ai_available,
+            "system_status": "operational" if stats["success_rate_percent"] > 50 else "degraded"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting embedding stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/debug/embeddings/test")
+async def debug_test_embedding(request: Dict[str, str]) -> Dict[str, Any]:
+    """
+    Debug: Test embedding generation for a text
+    """
+    try:
+        text = request.get("text", "Test embedding text")
+        task_type = request.get("task_type", "retrieval_document")
+        
+        embedder = get_embedder()
+        
+        # Import task type enum
+        from ai.embedder import EmbeddingTaskType
+        task_enum = EmbeddingTaskType(task_type)
+        
+        result = await embedder.embed_text(text, task_enum)
+        
+        return {
+            "text": text,
+            "task_type": task_type,
+            "success": result.success,
+            "model_used": result.model_used,
+            "execution_time_ms": result.execution_time_ms,
+            "embedding_dimension": len(result.embedding) if result.embedding is not None else 0,
+            "embedding_preview": result.embedding[:10].tolist() if result.embedding is not None else None,
+            "error_message": result.error_message
+        }
+        
+    except Exception as e:
+        logger.error(f"Error testing embedding: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "text": request.get("text", ""),
+            "task_type": request.get("task_type", "")
+        }
+
+
+@app.post("/debug/embeddings/compare")
+async def debug_compare_embeddings(request: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Debug: Compare embeddings between two texts
+    """
+    try:
+        text1 = request.get("text1", "")
+        text2 = request.get("text2", "")
+        
+        if not text1 or not text2:
+            raise HTTPException(status_code=400, detail="Both text1 and text2 are required")
+        
+        embedder = get_embedder()
+        from ai.embedder import EmbeddingTaskType
+        
+        # Generate embeddings
+        result1 = await embedder.embed_text(text1, EmbeddingTaskType.SEMANTIC_SIMILARITY)
+        result2 = await embedder.embed_text(text2, EmbeddingTaskType.SEMANTIC_SIMILARITY)
+        
+        if not (result1.success and result2.success):
+            return {
+                "success": False,
+                "error": "Failed to generate embeddings",
+                "result1": {"success": result1.success, "error": result1.error_message},
+                "result2": {"success": result2.success, "error": result2.error_message}
+            }
+        
+        # Calculate similarity
+        from sklearn.metrics.pairwise import cosine_similarity
+        similarity = cosine_similarity(
+            result1.embedding.reshape(1, -1),
+            result2.embedding.reshape(1, -1)
+        )[0][0]
+        
+        return {
+            "text1": text1,
+            "text2": text2,
+            "similarity_score": float(similarity),
+            "model_used": result1.model_used,
+            "execution_time_ms": result1.execution_time_ms + result2.execution_time_ms,
+            "interpretation": "Very similar" if similarity > 0.8 else "Similar" if similarity > 0.6 else "Somewhat similar" if similarity > 0.4 else "Different"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error comparing embeddings: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/debug/chat/context")
+async def debug_chat_context(request: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Debug: Test the enhanced context building for chat
+    """
+    try:
+        query = request.get("query", "What is my deductible?")
+        context_limit = request.get("context_limit", 5)
+        
+        # Get retrieval results
+        result = await rag_retriever.retrieve(
+            query=query,
+            top_k=context_limit,
+            similarity_threshold=0.3
+        )
+        
+        # Get policy summary
+        chatbot_instance = chatbot
+        policy_summary = await chatbot_instance._get_policy_summary([])
+        
+        # Build both types of context
+        basic_context = chatbot_instance._build_context_from_chunks(result.chunks)
+        enhanced_context = chatbot_instance._build_enhanced_context(result.chunks, policy_summary)
+        
+        return {
+            "query": query,
+            "chunks_found": len(result.chunks),
+            "execution_time_ms": result.execution_time_ms,
+            "policy_summary": policy_summary,
+            "basic_context": basic_context,
+            "enhanced_context": enhanced_context,
+            "chunks_details": [
+                {
+                    "similarity": chunk.similarity_score,
+                    "source": chunk.source_document,
+                    "text_preview": chunk.text[:200] + "..." if len(chunk.text) > 200 else chunk.text
+                }
+                for chunk in result.chunks
+            ]
+        }
+        
+    except Exception as e:
+        logger.error(f"Error testing chat context: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 if __name__ == "__main__":
     import uvicorn
     

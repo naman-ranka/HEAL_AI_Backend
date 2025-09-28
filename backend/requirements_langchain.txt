@@ -1,0 +1,49 @@
+# HEAL - LangChain Implementation Requirements
+# Single production-ready implementation using LangChain
+
+# FastAPI and web framework
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+python-dotenv==1.0.0
+
+# LangChain Core Components
+langchain==0.1.20
+langchain-core==0.1.52
+langchain-community==0.0.38
+
+# LangChain Google Integration
+langchain-google-genai==1.0.3
+
+# Document Processing
+pypdf==4.2.0
+unstructured==0.13.7
+# For image processing
+pillow==10.2.0
+pytesseract==0.3.10
+
+# Vector Store
+faiss-cpu==1.8.0
+
+# Data validation
+pydantic==2.6.0
+
+# Database
+# sqlite3 is built into Python
+
+# Async support
+aiofiles==23.2.0
+
+# Utilities for testing
+requests==2.31.0
+
+# Optional dependencies (uncomment as needed)
+# chromadb==0.4.24  # Alternative vector store
+# pinecone-client==3.2.2  # Cloud vector store
+# langchain-pinecone==0.1.0
+# langchain-chroma==0.1.0
+
+# For production deployment
+# redis==5.0.3  # For session management
+# postgresql-asyncpg==0.29.0  # For production database
+# langchain-postgres==0.0.6

@@ -69,7 +69,7 @@ class InsuranceChatbot:
         self, 
         message: str, 
         session_id: str,
-        context_limit: int = 3
+        context_limit: int = 5
     ) -> ChatResponse:
         """
         Process a chat message and return AI response with RAG context
@@ -92,18 +92,30 @@ class InsuranceChatbot:
             
             document_ids = json.loads(session_info['document_context']) if session_info['document_context'] else None
             
-            # Retrieve relevant context using RAG
+            # Retrieve relevant context using RAG with improved parameters
             retrieval_result = await self.retriever.retrieve(
                 query=message,
                 top_k=context_limit,
+                similarity_threshold=0.3,  # Lower threshold for more permissive matching
                 document_ids=document_ids
             )
             
-            # Build context from retrieved chunks
-            context = self._build_context_from_chunks(retrieval_result.chunks)
+            # Get policy summary for additional context
+            policy_summary = await self._get_policy_summary(document_ids)
             
-            # Generate AI response
-            ai_response = await self._generate_ai_response(message, context, retrieval_result.chunks)
+            # Build enhanced context from retrieved chunks and policy summary
+            context = self._build_enhanced_context(retrieval_result.chunks, policy_summary)
+            
+            # Get conversation history for context
+            conversation_history = self.get_chat_history(session_id, limit=10)
+            
+            # Generate AI response with conversation context
+            ai_response = await self._generate_ai_response(
+                message, 
+                context, 
+                retrieval_result.chunks,
+                conversation_history
+            )
             
             # Calculate confidence based on retrieval quality
             confidence = self._calculate_response_confidence(retrieval_result.chunks)
@@ -166,20 +178,86 @@ class InsuranceChatbot:
         
         return "\n\n".join(context_parts)
     
+    def _build_enhanced_context(self, chunks: List[RetrievedChunk], policy_summary: str) -> str:
+        """Build enhanced context with policy summary and retrieved chunks"""
+        context_parts = []
+        
+        # Add policy summary first for overall context
+        if policy_summary:
+            context_parts.append(f"[POLICY OVERVIEW]:\n{policy_summary}")
+        
+        # Add specific relevant chunks
+        if chunks:
+            context_parts.append(f"[RELEVANT POLICY SECTIONS]:")
+            for i, chunk in enumerate(chunks, 1):
+                context_parts.append(f"Section {i} ({chunk.source_document}, similarity: {chunk.similarity_score:.3f}):\n{chunk.text}")
+        else:
+            context_parts.append("[RELEVANT POLICY SECTIONS]:\nNo specific sections found matching your query.")
+        
+        return "\n\n".join(context_parts)
+    
+    async def _get_policy_summary(self, document_ids: Optional[List[int]] = None) -> str:
+        """Get policy summary from the most recent policy analysis"""
+        try:
+            conn = get_db_connection()
+            try:
+                cursor = conn.cursor()
+                
+                # Get the most recent policy analysis result
+                cursor.execute("""
+                    SELECT summary_json FROM policies 
+                    ORDER BY id DESC 
+                    LIMIT 1
+                """)
+                
+                row = cursor.fetchone()
+                if not row:
+                    return ""
+                
+                policy_data = json.loads(row[0])
+                
+                # Build a structured summary
+                summary_parts = []
+                
+                if policy_data.get('deductible'):
+                    summary_parts.append(f"Deductible: {policy_data['deductible']}")
+                
+                if policy_data.get('out_of_pocket_max'):
+                    summary_parts.append(f"Out-of-Pocket Maximum: {policy_data['out_of_pocket_max']}")
+                
+                if policy_data.get('copay'):
+                    summary_parts.append(f"Copay Information: {policy_data['copay']}")
+                
+                if policy_data.get('confidence_score'):
+                    summary_parts.append(f"Analysis Confidence: {policy_data['confidence_score']}")
+                
+                if summary_parts:
+                    return "This insurance policy analysis shows:\n" + "\n".join(f"• {part}" for part in summary_parts)
+                else:
+                    return "Policy analysis data available but no key details extracted."
+                    
+            finally:
+                conn.close()
+                
+        except Exception as e:
+            logger.error(f"Error getting policy summary: {e}")
+            return ""
+    
     async def _generate_ai_response(
         self, 
         user_message: str, 
         context: str,
-        chunks: List[RetrievedChunk]
+        chunks: List[RetrievedChunk],
+        conversation_history: List[Dict[str, Any]] = None
     ) -> str:
         """Generate AI response using context"""
         
         if not ai_config.is_available():
-            return self._generate_fallback_response(user_message, chunks)
+            return self._generate_fallback_response(user_message, chunks, conversation_history)
         
         try:
-            # Build the prompt with context
-            prompt = self._build_rag_prompt(user_message, context)
+            # Build the prompt with context and conversation history
+            prompt = self._build_conversational_rag_prompt(user_message, context, conversation_history)
             
             # Generate response using Gemini
             model = ai_config.get_model('pro')
@@ -189,21 +267,23 @@ class InsuranceChatbot:
             
         except Exception as e:
             logger.error(f"Error generating AI response: {e}")
-            return self._generate_fallback_response(user_message, chunks)
+            return self._generate_fallback_response(user_message, chunks, conversation_history)
     
     def _build_rag_prompt(self, user_message: str, context: str) -> str:
-        """Build the RAG prompt with context"""
+        """Build the RAG prompt with enhanced context"""
         return f"""You are HEAL, an expert insurance policy assistant. Your role is to help users understand their insurance policies based on the provided policy information.
 
 **Guidelines:**
-1. Answer questions based ONLY on the provided policy context
-2. If information is not in the policy context, clearly state "I don't have that information in your policy documents"
-3. Be helpful, clear, and concise
-4. Use simple language that policyholders can understand
-5. Always be accurate and conservative in your responses
-6. If you're uncertain, say so and suggest contacting the insurance company
+1. Use BOTH the policy overview and specific policy sections to provide comprehensive answers
+2. Start with information from the policy overview when available, then reference specific sections
+3. If information is not in the provided context, clearly state "I don't have that information in your policy documents"
+4. Be helpful, clear, and concise
+5. Use simple language that policyholders can understand
+6. Always be accurate and conservative in your responses
+7. When referencing specific amounts or details, mention if they come from the overview vs specific sections
+8. If you're uncertain, say so and suggest contacting the insurance company
 
-**Policy Information:**
+**Available Policy Information:**
 {context}
 
 **User Question:**
@@ -211,8 +291,43 @@ class InsuranceChatbot:
 
 **Your Response:**
 Based on the policy information provided, """
+
+    def _build_conversational_rag_prompt(self, user_message: str, context: str, conversation_history: List[Dict[str, Any]] = None) -> str:
+        """Build a conversational RAG prompt with chat history"""
+        
+        # Build conversation history string
+        history_context = ""
+        if conversation_history and len(conversation_history) > 0:
+            history_context = "\n**Previous Conversation:**\n"
+            for msg in conversation_history[-6:]:  # Last 6 messages for context
+                role = "User" if msg['message_type'] == 'user' else "HEAL"
+                history_context += f"{role}: {msg['content']}\n"
+            history_context += "\n"
+        
+        return f"""You are HEAL, an expert insurance policy assistant. You maintain conversational context and help users understand their insurance policies.
+
+**Guidelines:**
+1. **MAINTAIN CONVERSATION FLOW**: Reference previous questions and answers when relevant
+2. **USE CONVERSATIONAL CONTEXT**: Build on what was previously discussed
+3. **BE CONSISTENT**: Don't contradict previous answers unless correcting an error
+4. **REFER BACK**: Use phrases like "As I mentioned earlier..." or "Building on your previous question..."
+5. **CLARIFY WHEN NEEDED**: If the user is asking about something mentioned before, acknowledge it
+6. **Use BOTH the policy overview and specific policy sections for comprehensive answers**
+7. **If information is not in the provided context, clearly state "I don't have that information in your policy documents"**
+8. **Be helpful, clear, and concise with simple language**
+9. **Always be accurate and conservative in your responses**
+10. **When referencing specific amounts, mention if they come from overview vs specific sections**
+
+{history_context}**Available Policy Information:**
+{context}
+
+**Current User Question:**
+{user_message}
+
+**Your Response:**
+"""
     
-    def _generate_fallback_response(self, user_message: str, chunks: List[RetrievedChunk]) -> str:
+    def _generate_fallback_response(self, user_message: str, chunks: List[RetrievedChunk], conversation_history: List[Dict[str, Any]] = None) -> str:
         """Generate a fallback response when AI is not available"""
         if not chunks:
             return "I don't have enough information in your policy documents to answer that question. Please contact your insurance company for specific details."

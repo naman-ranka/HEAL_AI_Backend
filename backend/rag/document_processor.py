@@ -183,7 +183,7 @@ class DocumentProcessor:
             logger.error(f"Error extracting text from PDF {file_path}: {e}")
             return ""
     
-    def _chunk_text(self, text: str, max_chunk_size: int = 500) -> List[DocumentChunk]:
+    def _chunk_text(self, text: str, max_chunk_size: int = 750) -> List[DocumentChunk]:
         """
         Chunk text into smaller pieces for embedding
         
@@ -216,6 +216,8 @@ class DocumentProcessor:
         chunk_index = 0
         
         logger.info(f"🔄 Processing {len(sentences)} sentences into chunks")
+        overlap_sentences = 2  # Number of sentences to overlap between chunks
+        
         for i, sentence in enumerate(sentences):
             if i % 100 == 0:  # Log progress every 100 sentences
                 logger.info(f"📊 Processing sentence {i}/{len(sentences)}")
@@ -234,7 +236,7 @@ class DocumentProcessor:
                 # Add sentence to current chunk
                 current_chunk += " " + sentence if current_chunk else sentence
             else:
-                # Save current chunk and start new one
+                # Save current chunk and start new one with overlap
                 if current_chunk.strip():
                     chunks.append(DocumentChunk(
                         text=current_chunk.strip(),
@@ -243,7 +245,13 @@ class DocumentProcessor:
                     ))
                     chunk_index += 1
                 
-                current_chunk = sentence
+                # Create overlap by keeping last few sentences
+                chunk_sentences = current_chunk.split('. ')
+                if len(chunk_sentences) > overlap_sentences:
+                    overlap_text = '. '.join(chunk_sentences[-overlap_sentences:])
+                    current_chunk = overlap_text + ". " + sentence
+                else:
+                    current_chunk = sentence
         
         # Add final chunk
         if current_chunk.strip():
