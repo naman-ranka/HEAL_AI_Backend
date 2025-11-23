@@ -311,9 +311,9 @@ def save_to_database(data: Dict[str, Any]) -> None:
         logger.error(f"Error saving to database: {e}")
         # Don't raise exception here, as the analysis was successful
 
-@app.get("/")
-async def root():
-    """Root endpoint with API information"""
+@app.get("/api")
+async def api_root():
+    """API root endpoint with API information"""
     return {
         "message": "HEAL - Insurance Policy Analyzer API",
         "version": "1.0.0",
@@ -324,6 +324,27 @@ async def root():
             "/chat": "POST - Chat with AI assistant (future feature)",
             "/docs": "GET - API documentation"
         }
+    }
+
+@app.get("/debug/static")
+async def debug_static():
+    """Debug endpoint to check static files"""
+    import os
+    static_exists = os.path.exists("static")
+    index_exists = os.path.exists("static/index.html")
+    
+    files = []
+    if static_exists:
+        try:
+            files = os.listdir("static")
+        except Exception as e:
+            files = [f"Error listing files: {e}"]
+    
+    return {
+        "static_directory_exists": static_exists,
+        "index_html_exists": index_exists,
+        "static_files": files,
+        "working_directory": os.getcwd()
     }
 
 
@@ -2123,18 +2144,35 @@ if os.path.exists("static"):
     async def serve_frontend(full_path: str):
         """Serve frontend files for production deployment - catch-all route"""
         from fastapi.responses import FileResponse
+        import os
         
-        # Serve index.html for client-side routing
-        if not full_path or full_path == "index.html":
-            return FileResponse("static/index.html")
+        logger.info(f"Frontend request for: {full_path}")
         
-        # Serve static assets
+        # Serve index.html for root and client-side routing
+        if not full_path or full_path == "" or full_path == "index.html":
+            logger.info("Serving index.html for root/empty path")
+            if os.path.exists("static/index.html"):
+                return FileResponse("static/index.html")
+            else:
+                logger.error("static/index.html not found!")
+                raise HTTPException(status_code=404, detail="Frontend not found")
+        
+        # Serve static assets (CSS, JS, images)
         file_path = f"static/{full_path}"
+        logger.info(f"Checking for static file: {file_path}")
         if os.path.exists(file_path):
+            logger.info(f"Serving static file: {file_path}")
             return FileResponse(file_path)
         
-        # Fallback to index.html for client-side routing
-        return FileResponse("static/index.html")
+        # For client-side routing (React Router), serve index.html
+        logger.info("Serving index.html for client-side routing")
+        if os.path.exists("static/index.html"):
+            return FileResponse("static/index.html")
+        else:
+            logger.error("static/index.html not found for fallback!")
+            raise HTTPException(status_code=404, detail="Frontend not found")
+else:
+    logger.warning("Static directory not found - frontend will not be served")
 
 
 if __name__ == "__main__":
