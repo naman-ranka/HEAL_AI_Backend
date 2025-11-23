@@ -281,6 +281,8 @@ test_uploads/
 # Backup files
 *.bak
 *.backup
+*_backup/
+frontend_old_backup/
 
 # Temporary files
 tmp/
