@@ -11,14 +11,14 @@ if [ ! -f "README.md" ] || [ ! -d "backend" ] || [ ! -d "frontend" ]; then
 fi
 
 echo "📦 Building frontend..."
-cd frontend
+cd frontend-clean
 npm install
 npm run build
 cd ..
 
 echo "📁 Copying frontend build to backend static folder..."
 rm -rf backend/static
-cp -r frontend/dist backend/static
+cp -r frontend-clean/dist backend/static
 
 echo "🐳 Building Docker image..."
 docker build -t heal-ai .

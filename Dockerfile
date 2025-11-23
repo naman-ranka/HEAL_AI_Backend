@@ -4,7 +4,7 @@ FROM node:18-alpine as frontend-builder
 
 WORKDIR /app/frontend-clean
 COPY frontend-clean/package*.json ./
-RUN npm ci --only=production
+RUN npm ci
 
 COPY frontend-clean/ ./
 RUN npm run build
@@ -16,6 +16,7 @@ FROM python:3.11-slim
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     tesseract-ocr-eng \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

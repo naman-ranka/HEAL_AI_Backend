@@ -20,14 +20,14 @@ if not exist "frontend" (
 )
 
 echo 📦 Building frontend...
-cd frontend
+cd frontend-clean
 call npm install
 call npm run build
 cd ..
 
 echo 📁 Copying frontend build to backend static folder...
 if exist "backend\static" rmdir /s /q "backend\static"
-xcopy /e /i "frontend\dist" "backend\static"
+xcopy /e /i "frontend-clean\dist" "backend\static"
 
 echo 🐳 Building Docker image...
 docker build -t heal-ai .
