@@ -1,0 +1,72 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+DEPLOYMENT.md
+*.md
+
+# Development files
+.vscode
+.cursor
+.env
+.env.*
+
+# Python cache
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.pytest_cache
+.coverage
+
+# Node.js
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn
+
+# Frontend source (we only need the built dist)
+frontend-clean/src
+frontend-clean/public
+frontend-clean/node_modules
+frontend-clean/.git*
+frontend-clean/vite.config.ts
+frontend-clean/tailwind.config.ts
+frontend-clean/tsconfig.json
+frontend-clean/package-lock.json
+
+# Backend development
+backend/venv
+backend/.env
+backend/*.db
+backend/uploads
+backend/test_*
+backend/debug_*
+
+# OS files
+.DS_Store
+Thumbs.db
+*.tmp
+*.log
+
+# Build artifacts
+*.tar.gz
+*.zip
+
+# IDE files
+*.swp
+*.swo
+*~
+
+# Deployment scripts (not needed in container)
+deploy.sh
+deploy.bat
+docker-compose.yml
+railway.json
+render.yaml
