@@ -39,7 +39,7 @@ frontend-clean/.git*
 frontend-clean/vite.config.ts
 frontend-clean/tailwind.config.ts
 frontend-clean/tsconfig.json
-frontend-clean/package-lock.json
+# Keep package.json and package-lock.json for Docker build
 
 # Backend development
 backend/venv
