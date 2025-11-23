@@ -59,7 +59,7 @@ HEAL AI is a comprehensive healthcare financial assistant that leverages cutting
 
 ```
 HEAL_AI_Backend/
-├── backend/
+├── backend/                             # Backend API server
 │   ├── main.py                          # FastAPI application (2091 lines)
 │   ├── genkit_api.py                    # Genkit-style API server
 │   ├── ai/
@@ -79,18 +79,19 @@ HEAL_AI_Backend/
 │   │   ├── gemini_service.py            # Gemini API wrapper
 │   │   └── bill_analysis_service.py     # Bill analysis logic
 │   └── requirements.txt                 # Python dependencies
-├── frontend/
-│   ├── src/
-│   │   ├── App.js                       # Main React component
-│   │   └── index.js                     # Entry point
-│   └── package.json                     # Node dependencies
-└── docs/                                # Comprehensive documentation
-    ├── RAG_IMPLEMENTATION_GUIDE.md
-    ├── BACKEND_SUCCESS_SUMMARY.md
-    ├── IMPLEMENTATION_SUMMARY.md
-    ├── GEMINI_SETUP.md
-    └── GENKIT_MIGRATION_GUIDE.md
+├── frontend/ @ heal-ai                  # React frontend (git submodule)
+│   └── (React + TypeScript application)
+├── docs/                                # Comprehensive documentation
+│   ├── RAG_IMPLEMENTATION_GUIDE.md
+│   ├── BACKEND_SUCCESS_SUMMARY.md
+│   ├── CHAT_IMPROVEMENTS_SUMMARY.md
+│   ├── IMPLEMENTATION_SUMMARY.md
+│   ├── GEMINI_SETUP.md
+│   └── GENKIT_MIGRATION_GUIDE.md
+└── .gitmodules                          # Submodule configuration
 ```
+
+**Note:** The `frontend` directory is a git submodule linking to a separate repository. Make sure to clone with `--recurse-submodules` or run `git submodule update --init` after cloning.
 
 ---
 
@@ -106,9 +107,15 @@ HEAL_AI_Backend/
 
 #### 1. Clone the Repository
 
+**Important:** This repository uses a git submodule for the frontend. Clone with submodules:
+
 ```bash
-git clone https://github.com/naman-ranka/HEAL_AI_Backend.git
+# Clone with submodules
+git clone --recurse-submodules https://github.com/naman-ranka/HEAL_AI_Backend.git
 cd HEAL_AI_Backend
+
+# Or if already cloned, initialize submodules
+git submodule update --init --recursive
 ```
 
 #### 2. Backend Setup
