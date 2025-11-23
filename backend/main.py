@@ -1238,8 +1238,8 @@ You must respond with a valid JSON object that matches this exact structure:
   }},
   "discrepancyCheck": {{
     "hasDiscrepancies": true/false,
-    "findings": "detailed analysis of any billing errors or policy misapplications",
-    "recommendations": "specific actions patient should take if any issues found"
+    "findings": "analysis of actual financial discrepancies where patient pays more than policy requires",
+    "recommendations": "specific actions only if patient is overcharged according to their policy terms"
   }}
 }}
 
@@ -1248,10 +1248,12 @@ CRITICAL INSTRUCTIONS:
 2. Use the policy details to calculate correct coverage
 3. Show detailed line-by-line service breakdown
 4. Calculate deductibles, copays, and coinsurance according to the policy
-5. Identify any billing errors or policy misapplications
-6. Return ONLY the JSON object, no other text
-7. Ensure all dollar amounts are accurate to the cent
-8. Include notes explaining each calculation
+5. ONLY flag discrepancies if the patient is paying MORE than they should according to their policy
+6. Out-of-network services are NOT errors if processed correctly per policy rules
+7. Return ONLY the JSON object, no other text
+8. Ensure all dollar amounts are accurate to the cent
+9. Include notes explaining each calculation
+10. Focus on financial accuracy, not administrative details
 """
 
         # Use existing Genkit AI infrastructure with Gemini 2.5 Pro

@@ -1,0 +1,3 @@
+[submodule "frontend-final"]
+	path = frontend-final
+	url = https://github.com/kspswati/heal-ai
