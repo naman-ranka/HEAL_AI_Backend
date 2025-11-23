@@ -1,15 +1,18 @@
-# HEAL AI - Healthcare Expense Analysis and Legislation
+# HEAL.AI - Healthcare Expenses Analyzer & Logger
 
 <div align="center">
 
 **🏆 2nd Place Winner - Devlabs Hackathon**
 
-*An AI-powered insurance document analysis platform that empowers patients to understand their medical bills and insurance policies*
+*An AI-powered healthcare financial assistant that empowers patients to understand their medical bills and insurance policies with unprecedented clarity*
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.109.0-009688?style=flat&logo=fastapi)](https://fastapi.tiangolo.com/)
-[![React](https://img.shields.io/badge/React-18.0-61DAFB?style=flat&logo=react)](https://reactjs.org/)
+[![React](https://img.shields.io/badge/React-18.3-61DAFB?style=flat&logo=react)](https://reactjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?style=flat&logo=typescript)](https://www.typescriptlang.org/)
+[![Vite](https://img.shields.io/badge/Vite-5.4-646CFF?style=flat&logo=vite)](https://vitejs.dev/)
 [![Google Gemini](https://img.shields.io/badge/Google_Gemini-2.5-4285F4?style=flat&logo=google)](https://ai.google.dev/)
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat&logo=python)](https://www.python.org/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-06B6D4?style=flat&logo=tailwindcss)](https://tailwindcss.com/)
 
 </div>
 
@@ -17,16 +20,28 @@
 
 ## 🎯 Overview
 
-HEAL AI is a comprehensive healthcare financial assistant that leverages cutting-edge AI technology to help patients navigate the complex world of medical insurance. Built during the Devlabs Hackathon where it secured **2nd place**, this platform combines document analysis, RAG-powered chatbots, and intelligent bill checking to give users unprecedented clarity over their healthcare expenses.
+HEAL.AI is a comprehensive healthcare financial assistant that leverages cutting-edge AI technology to help patients navigate the complex world of medical insurance. Built during the Devlabs Hackathon where it secured **2nd place**, this platform combines advanced document analysis, RAG-powered conversational AI, and intelligent bill verification to give users unprecedented clarity and control over their healthcare expenses.
+
+### 🌟 Problem Statement
+
+**80% of medical bills contain errors** - Patients struggle to understand:
+- What part is covered by insurance?
+- What's truly owed out-of-pocket?
+- Are there errors or duplicate charges?
+- How to dispute billing discrepancies?
+
+Navigating medical billing and health insurance is confusing and stressful for most patients, leading to overpayment and financial stress.
 
 ### 🌟 Key Features
 
-- **📄 Insurance Policy Analysis** - Upload insurance cards or policy documents to automatically extract key information including deductibles, out-of-pocket maximums, copays, and coverage details
-- **💰 Medical Bill Checker** - Analyze medical bills against your insurance policy to identify billing errors, coverage discrepancies, and potential disputes
-- **🤖 RAG-Powered Chatbot** - Ask natural language questions about your insurance policy and get accurate, source-attributed answers
-- **📧 Dispute Generation** - Automatically generate FDCPA-compliant dispute emails for billing errors
-- **🔍 Semantic Search** - Advanced vector-based search across your policy documents
-- **📊 Session Management** - Persistent chat sessions with full conversation history
+- **📄 AI-Powered Insurance Analysis** - Upload insurance cards or policy documents to automatically extract deductibles, out-of-pocket maximums, copays, and comprehensive coverage details
+- **💰 Smart Medical Bill Checker** - Analyze medical bills against your insurance policy to identify billing errors, coverage discrepancies, and potential disputes with detailed financial breakdowns
+- **🤖 RAG-Powered Conversational AI** - Ask natural language questions about your insurance policy and get accurate, source-attributed answers through an intuitive chat interface
+- **📧 Automated Dispute Generation** - Generate FDCPA-compliant dispute emails for billing errors with professional templates
+- **🔍 Advanced Semantic Search** - Vector-based search across your policy documents with confidence scoring
+- **📊 Comprehensive Dashboard** - Modern, responsive interface with insurance summaries, bill history, and emergency QR codes
+- **💬 Persistent Chat Sessions** - Full conversation history with context-aware responses
+- **🏥 Emergency QR Code** - Instant access to critical medical information for emergency situations
 
 ---
 
@@ -34,62 +49,111 @@ HEAL AI is a comprehensive healthcare financial assistant that leverages cutting
 
 ### Tech Stack
 
-#### Backend
-- **FastAPI** - Modern, high-performance Python web framework
+#### Frontend (Modern React SPA)
+- **React 18.3** - Latest React with concurrent features and improved performance
+- **TypeScript 5.8** - Full type safety and enhanced developer experience
+- **Vite 5.4** - Lightning-fast build tool and development server
+- **Tailwind CSS 3.4** - Utility-first CSS framework with custom design system
+- **shadcn/ui** - Modern, accessible component library with 50+ components
+- **React Router 6** - Client-side routing with nested routes
+- **TanStack Query** - Powerful data fetching and caching
+- **React Hook Form** - Performant forms with validation
+- **Lucide React** - Beautiful, customizable icons
+- **React Markdown** - Rich markdown rendering with syntax highlighting
+
+#### Backend (Python FastAPI)
+- **FastAPI 0.109** - Modern, high-performance Python web framework
 - **Google Gemini 2.5** - State-of-the-art multimodal AI (Flash & Pro models)
 - **SQLite** - Efficient local database with comprehensive schema
 - **scikit-learn** - Vector similarity and machine learning operations
 - **pytesseract** - OCR for image processing
-- **PyMuPDF** - PDF text extraction
+- **PyMuPDF** - PDF text extraction and processing
 - **NLTK** - Natural language processing and tokenization
+- **Pydantic** - Data validation and serialization
 
 #### AI/ML Pipeline
 - **Retrieval-Augmented Generation (RAG)** - Context-aware document question answering
 - **Vector Embeddings** - Google's text-embedding-004 (768 dimensions)
-- **Semantic Search** - Cosine similarity-based retrieval
-- **Document Chunking** - Intelligent text segmentation with overlap
-
-#### Frontend
-- **React 18** - Modern, component-based UI framework
-- **Responsive Design** - Mobile-friendly interface
+- **Semantic Search** - Cosine similarity-based retrieval with confidence scoring
+- **Document Chunking** - Intelligent text segmentation with 2-sentence overlap
+- **Multimodal Analysis** - Simultaneous processing of images and text
 
 ---
 
 ## 📁 Project Structure
 
 ```
-HEAL_AI_Backend/
-├── backend/
-│   ├── main.py                          # FastAPI application (2091 lines)
-│   ├── genkit_api.py                    # Genkit-style API server
-│   ├── ai/
+HEAL/
+├── backend/                             # Python FastAPI Backend
+│   ├── main.py                          # Main FastAPI application (2000+ lines)
+│   ├── langchain_main.py                # LangChain integration server
+│   ├── genkit_api.py                    # Genkit-style API patterns
+│   ├── ai/                              # AI Processing Layer
 │   │   ├── flows/
-│   │   │   ├── policy_analysis.py       # Policy extraction flows
+│   │   │   ├── policy_analysis.py       # Insurance policy extraction flows
 │   │   │   └── chatbot.py               # RAG chatbot implementation
 │   │   ├── embedder.py                  # Gemini embeddings with fallback
-│   │   ├── genkit_config.py             # AI configuration
+│   │   ├── genkit_config.py             # AI service configuration
 │   │   └── schemas.py                   # Pydantic data models
-│   ├── rag/
-│   │   ├── document_processor.py        # Text extraction & chunking
-│   │   ├── retriever.py                 # Vector similarity search
-│   │   └── chatbot.py                   # RAG-powered chatbot
-│   ├── database/
-│   │   └── schema.py                    # SQLite schema & connections
-│   ├── services/
-│   │   ├── gemini_service.py            # Gemini API wrapper
-│   │   └── bill_analysis_service.py     # Bill analysis logic
-│   └── requirements.txt                 # Python dependencies
-├── frontend/
+│   ├── rag/                             # RAG System Components
+│   │   ├── document_processor.py        # Text extraction & intelligent chunking
+│   │   ├── retriever.py                 # Vector similarity search engine
+│   │   └── chatbot.py                   # Context-aware RAG chatbot
+│   ├── database/                        # Database Layer
+│   │   └── schema.py                    # SQLite schema & connection management
+│   ├── services/                        # Business Logic Services
+│   │   ├── gemini_service.py            # Gemini API wrapper & utilities
+│   │   └── bill_analysis_service.py     # Medical bill analysis engine
+│   ├── uploads/                         # File storage directory
+│   ├── requirements.txt                 # Python dependencies
+│   └── venv/                            # Virtual environment
+├── frontend/ (Git Submodule)            # Modern React TypeScript Frontend
 │   ├── src/
-│   │   ├── App.js                       # Main React component
-│   │   └── index.js                     # Entry point
-│   └── package.json                     # Node dependencies
-└── docs/                                # Comprehensive documentation
-    ├── RAG_IMPLEMENTATION_GUIDE.md
-    ├── BACKEND_SUCCESS_SUMMARY.md
-    ├── IMPLEMENTATION_SUMMARY.md
-    ├── GEMINI_SETUP.md
-    └── GENKIT_MIGRATION_GUIDE.md
+│   │   ├── App.tsx                      # Main application component
+│   │   ├── main.tsx                     # Vite entry point
+│   │   ├── components/                  # Reusable UI Components
+│   │   │   ├── ui/                      # shadcn/ui component library (50+ components)
+│   │   │   ├── layout/                  # Layout components (Header, Layout)
+│   │   │   ├── sections/                # Page sections (Hero, Features, Upload)
+│   │   │   ├── BillSummaryCard.tsx      # Bill analysis display (374 lines)
+│   │   │   ├── PolicySummary.tsx        # Insurance policy visualization
+│   │   │   ├── DisputeEmailModal.tsx    # Dispute generation interface
+│   │   │   ├── BillAnalysisLoader.tsx   # Loading states for analysis
+│   │   │   └── MarkdownMessage.tsx      # Rich text message rendering
+│   │   ├── pages/                       # Application Pages
+│   │   │   ├── Index.tsx                # Landing page with hero section
+│   │   │   ├── Dashboard.tsx            # Main dashboard with tabs
+│   │   │   ├── Chat.tsx                 # AI chat interface
+│   │   │   ├── BillSummary.tsx          # Detailed bill analysis view
+│   │   │   ├── Admin.tsx                # Admin panel for data management
+│   │   │   └── NotFound.tsx             # 404 error page
+│   │   ├── contexts/                    # React Context Providers
+│   │   │   └── AppContext.tsx           # Global application state
+│   │   ├── services/                    # API Integration Layer
+│   │   │   └── api.ts                   # Comprehensive API service (420+ lines)
+│   │   ├── hooks/                       # Custom React Hooks
+│   │   │   ├── use-toast.ts             # Toast notification system
+│   │   │   └── use-mobile.tsx           # Mobile responsive utilities
+│   │   └── lib/                         # Utility Functions
+│   │       └── utils.ts                 # Common utilities and helpers
+│   ├── public/                          # Static Assets
+│   │   ├── favicon.ico                  # Application favicon
+│   │   └── placeholder.svg              # Placeholder images
+│   ├── dist/                            # Production build output
+│   ├── package.json                     # Node.js dependencies & scripts
+│   ├── tailwind.config.ts               # Tailwind CSS configuration
+│   ├── vite.config.ts                   # Vite build configuration
+│   ├── tsconfig.json                    # TypeScript configuration
+│   └── components.json                  # shadcn/ui component configuration
+├── docs/                                # Comprehensive Documentation
+│   ├── RAG_IMPLEMENTATION_GUIDE.md      # RAG system implementation details
+│   ├── BACKEND_SUCCESS_SUMMARY.md       # Backend development summary
+│   ├── IMPLEMENTATION_SUMMARY.md        # Overall project implementation
+│   ├── GEMINI_SETUP.md                  # Google Gemini API setup guide
+│   ├── GENKIT_MIGRATION_GUIDE.md        # Genkit pattern migration
+│   └── CHAT_IMPROVEMENTS_SUMMARY.md     # Chat system enhancements
+├── .gitmodules                          # Git submodule configuration
+└── README.md                            # This comprehensive guide
 ```
 
 ---
@@ -136,10 +200,18 @@ cp env.example .env
 #### 3. Frontend Setup
 
 ```bash
+# Initialize submodules (if cloning fresh)
+git submodule update --init --recursive
+
 cd frontend
 
 # Install dependencies
 npm install
+
+# Or using alternative package managers:
+# yarn install
+# pnpm install
+# bun install
 ```
 
 ### Configuration
@@ -157,19 +229,44 @@ ENVIRONMENT=development
 
 ```bash
 cd backend
+
+# Activate virtual environment
+# On Windows:
+venv\Scripts\activate
+# On macOS/Linux:
+source venv/bin/activate
+
+# Start the FastAPI server
 python main.py
+# Or using uvicorn directly:
+# uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 Backend runs on `http://localhost:8000`
+- API Documentation: `http://localhost:8000/docs`
+- Alternative docs: `http://localhost:8000/redoc`
 
 #### Start Frontend Development Server
 
 ```bash
 cd frontend
-npm start
+
+# Start Vite development server
+npm run dev
+# Or using alternative package managers:
+# yarn dev
+# pnpm dev
+# bun dev
+
+# For production build:
+# npm run build
+# npm run preview
 ```
 
-Frontend runs on `http://localhost:3000`
+Frontend runs on `http://localhost:8080` (Vite default)
+- Hot module replacement enabled
+- TypeScript compilation
+- Tailwind CSS processing
 
 ---
 
@@ -257,32 +354,54 @@ Dispute Recommendations
 
 ## 🎨 Features in Detail
 
+### Modern Frontend Experience
+
+- **Responsive Design** - Mobile-first approach with adaptive layouts
+- **Dark/Light Mode** - System preference detection with manual toggle
+- **Progressive Loading** - Skeleton screens and optimistic updates
+- **Real-time Updates** - Live chat interface with typing indicators
+- **Accessibility** - WCAG 2.1 compliant with keyboard navigation
+- **Component Library** - 50+ reusable shadcn/ui components
+- **Type Safety** - Full TypeScript coverage with strict mode
+- **State Management** - React Context with optimistic updates
+
 ### Advanced AI Capabilities
 
 - **Multimodal Analysis** - Processes both images and text simultaneously
-- **Vector Embeddings** - Google's latest text-embedding-004 model
+- **Vector Embeddings** - Google's latest text-embedding-004 model (768 dimensions)
 - **Fallback Handling** - Graceful degradation when AI services are unavailable
-- **Confidence Scoring** - All responses include reliability metrics
-- **Semantic Search** - Context-aware document retrieval
+- **Confidence Scoring** - All responses include reliability metrics (0-1 scale)
+- **Semantic Search** - Context-aware document retrieval with similarity thresholds
+- **Conversation Memory** - Maintains context across chat sessions
+- **Source Attribution** - Links responses to specific document sections
 
-### Database Schema
+### Comprehensive Database Schema
 
 ```sql
-policies          # Uploaded insurance policies
-documents         # Policy documents with metadata
-document_chunks   # Chunked text with embeddings
-chat_sessions     # User chat sessions
-chat_messages     # Conversation history
-bill_analyses     # Medical bill analysis results
-rag_queries       # RAG query logs and statistics
+-- Core Tables
+policies              # Insurance policy metadata and analysis results
+documents             # Uploaded documents with file information
+document_chunks       # Text chunks with vector embeddings (768-dim)
+chat_sessions         # User chat sessions with document context
+chat_messages         # Complete conversation history
+bill_analyses         # Medical bill analysis results and recommendations
+rag_queries           # RAG query logs with performance metrics
+
+-- Analytics Tables
+upload_logs           # File upload tracking and error logs
+embedding_stats       # Vector embedding performance metrics
+user_interactions     # User behavior analytics
 ```
 
-### Developer Tools
+### Developer Experience
 
+- **Hot Reload** - Instant updates during development (Vite HMR)
 - **Debug Endpoints** - Comprehensive debugging tools for development
-- **Admin Tools** - Database management and cleanup utilities
-- **Logging** - Detailed logging throughout the application
-- **Type Safety** - Pydantic models for all data structures
+- **Admin Panel** - Database management and cleanup utilities in frontend
+- **Comprehensive Logging** - Structured logging throughout the application
+- **Type Safety** - Pydantic models (backend) + TypeScript interfaces (frontend)
+- **API Documentation** - Auto-generated OpenAPI/Swagger docs
+- **Error Boundaries** - Graceful error handling with user-friendly messages
 
 ---
 
@@ -305,13 +424,38 @@ rag_queries       # RAG query logs and statistics
 
 ---
 
-## 📚 Use Cases
+## 📚 Use Cases & User Journey
 
-1. **Policy Understanding** - Upload your insurance card and instantly understand your coverage
-2. **Bill Verification** - Check if your medical bills match your insurance coverage
-3. **Cost Planning** - Ask questions about coverage for specific procedures
-4. **Dispute Resolution** - Generate professional dispute emails for billing errors
-5. **Coverage Comparison** - Understand what services are covered vs. not covered
+### 1. **New User Onboarding**
+- Upload insurance card or policy document via drag-and-drop interface
+- AI extracts key information (deductible, copay, out-of-pocket max)
+- View comprehensive policy summary in dashboard
+- Access emergency QR code for critical medical information
+
+### 2. **Medical Bill Analysis**
+- Upload medical bill (PDF, image, or photo)
+- AI analyzes bill against insurance policy
+- Receive detailed financial breakdown with coverage analysis
+- Identify potential billing errors or discrepancies
+- Generate professional dispute emails if needed
+
+### 3. **Interactive Policy Consultation**
+- Ask natural language questions about coverage
+- Get instant, source-attributed answers from AI chatbot
+- Explore coverage scenarios for planned procedures
+- Understand network restrictions and referral requirements
+
+### 4. **Ongoing Healthcare Management**
+- Track bill analysis history with searchable interface
+- Monitor healthcare spending patterns
+- Access emergency medical information via QR code
+- Maintain conversation history for reference
+
+### 5. **Administrative Tasks**
+- Generate FDCPA-compliant dispute letters
+- Export analysis results for record-keeping
+- Manage multiple insurance policies (family coverage)
+- Reset and clean data through admin panel
 
 ---
 
@@ -320,17 +464,60 @@ rag_queries       # RAG query logs and statistics
 ### Running Tests
 
 ```bash
+# Backend tests
 cd backend
 python test_backend.py
+python test_langchain_complete.py
+python test_genkit_system.py
+
+# Frontend tests (if configured)
+cd frontend
+npm run test
+npm run test:coverage
 ```
 
-### Debug Mode
+### Development Tools
 
-Access debug endpoints for development:
+#### Backend Debug Endpoints
 - `/debug/upload-process/{id}` - Debug upload flow
-- `/debug/latest-upload` - Latest document information
+- `/debug/latest-upload` - Latest document information  
 - `/debug/embeddings/stats` - Embedding statistics
 - `/debug/chat/context` - Test chat context building
+- `/admin/database-info` - Database statistics
+- `/admin/reset-all` - Reset all data (development only)
+
+#### Frontend Development
+```bash
+cd frontend
+
+# Development server with hot reload
+npm run dev
+
+# Type checking
+npm run type-check
+
+# Linting
+npm run lint
+
+# Build for production
+npm run build
+
+# Preview production build
+npm run preview
+```
+
+### Git Submodule Management
+
+```bash
+# Update frontend submodule to latest
+git submodule update --remote frontend
+
+# Pull latest changes including submodules
+git pull --recurse-submodules
+
+# Clone with submodules
+git clone --recurse-submodules <repository-url>
+```
 
 ---
 
@@ -345,14 +532,31 @@ Access debug endpoints for development:
 
 ## 🔮 Future Enhancements
 
-- [ ] Multi-language support
-- [ ] Mobile application
+### Frontend Improvements
+- [ ] Progressive Web App (PWA) support
+- [ ] Offline functionality with service workers
+- [ ] Advanced data visualization with charts
+- [ ] Multi-language internationalization (i18n)
+- [ ] Enhanced accessibility features
+- [ ] Mobile-optimized touch interactions
+
+### Backend & AI Enhancements  
+- [ ] Multi-user authentication and authorization
+- [ ] Cloud database integration (PostgreSQL/MongoDB)
 - [ ] Integration with healthcare provider APIs
-- [ ] Advanced analytics dashboard
-- [ ] Export to PDF/Excel functionality
-- [ ] Multi-user support with authentication
-- [ ] Cloud database integration
+- [ ] Advanced analytics and reporting dashboard
+- [ ] Export functionality (PDF/Excel/CSV)
 - [ ] Real-time collaboration features
+- [ ] Enhanced OCR with multiple AI models
+- [ ] Voice input and audio responses
+
+### System Architecture
+- [ ] Microservices architecture
+- [ ] Docker containerization
+- [ ] Kubernetes deployment
+- [ ] CI/CD pipeline automation
+- [ ] Performance monitoring and alerting
+- [ ] Automated testing suite expansion
 
 ---
 
