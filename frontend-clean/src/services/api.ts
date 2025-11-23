@@ -1,5 +1,7 @@
 // API Service Layer for HEAL.AI Frontend
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = process.env.NODE_ENV === 'production' 
+  ? '' // Use same origin in production (Railway)
+  : 'http://localhost:8000'; // Use localhost in development
 
 // Types for API responses
 export interface PolicyAnalysisResponse {
