@@ -31,15 +31,11 @@ yarn-error.log*
 .npm
 .yarn
 
-# Frontend source (we only need the built dist)
-frontend-clean/src
-frontend-clean/public
+# Frontend build artifacts (keep source files for Docker build)
 frontend-clean/node_modules
 frontend-clean/.git*
-frontend-clean/vite.config.ts
-frontend-clean/tailwind.config.ts
-frontend-clean/tsconfig.json
-# Keep package.json and package-lock.json for Docker build
+frontend-clean/dist
+# Keep source files, config files, and package files for Docker build
 
 # Backend development
 backend/venv
