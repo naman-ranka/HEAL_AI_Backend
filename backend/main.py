@@ -105,28 +105,6 @@ except Exception as e:
 if os.path.exists("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
     logger.info("Static files mounted at /static")
-    
-    # Serve frontend at root path for production
-    @app.get("/{full_path:path}")
-    async def serve_frontend(full_path: str):
-        """Serve frontend files for production deployment"""
-        from fastapi.responses import FileResponse
-        
-        # API routes should not be caught by this
-        if full_path.startswith(("api/", "docs", "redoc", "health", "upload", "chat/", "bill-checker/", "admin/", "rag/", "debug/")):
-            raise HTTPException(status_code=404, detail="API endpoint not found")
-        
-        # Serve index.html for client-side routing
-        if not full_path or full_path == "index.html":
-            return FileResponse("static/index.html")
-        
-        # Serve static assets
-        file_path = f"static/{full_path}"
-        if os.path.exists(file_path):
-            return FileResponse(file_path)
-        
-        # Fallback to index.html for client-side routing
-        return FileResponse("static/index.html")
 
 @app.post("/upload", response_model=PolicyAnalysisOutput)
 async def upload_document(file: UploadFile = File(...)) -> PolicyAnalysisOutput:
@@ -2137,6 +2115,26 @@ async def cleanup_embedding_dimensions() -> Dict[str, Any]:
         
     finally:
         conn.close()
+
+
+# Serve frontend files for production deployment (MUST be last route)
+if os.path.exists("static"):
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        """Serve frontend files for production deployment - catch-all route"""
+        from fastapi.responses import FileResponse
+        
+        # Serve index.html for client-side routing
+        if not full_path or full_path == "index.html":
+            return FileResponse("static/index.html")
+        
+        # Serve static assets
+        file_path = f"static/{full_path}"
+        if os.path.exists(file_path):
+            return FileResponse(file_path)
+        
+        # Fallback to index.html for client-side routing
+        return FileResponse("static/index.html")
 
 
 if __name__ == "__main__":
