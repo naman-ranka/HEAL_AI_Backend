@@ -13,20 +13,40 @@ from datetime import datetime
 from typing import Dict, Any, List
 from dotenv import load_dotenv
 
-# Import AI flows and schemas
-from ai.flows.policy_analysis import analyze_insurance_policy, summarize_policy_document
-from ai.genkit_config import ai_config
-from ai.schemas import (
-    PolicyAnalysisInput, 
-    PolicyAnalysisOutput,
-    DocumentType,
-    HealthCheckOutput
-)
+# Import AI flows and schemas with error handling
+try:
+    from ai.flows.policy_analysis import analyze_insurance_policy, summarize_policy_document
+    from ai.genkit_config import ai_config
+    from ai.schemas import (
+        PolicyAnalysisInput, 
+        PolicyAnalysisOutput,
+        DocumentType,
+        HealthCheckOutput
+    )
+    AI_IMPORTS_SUCCESS = True
+except ImportError as e:
+    logger.error(f"AI imports failed: {e}")
+    AI_IMPORTS_SUCCESS = False
+    # Create mock objects
+    class MockConfig:
+        def is_available(self): return False
+    ai_config = MockConfig()
 
-# Import RAG system
-from rag import DocumentProcessor, RAGRetriever, InsuranceChatbot
-from database import create_rag_tables
-from ai.embedder import get_embedder
+# Import RAG system with error handling
+try:
+    from rag import DocumentProcessor, RAGRetriever, InsuranceChatbot
+    from database import create_rag_tables
+    from ai.embedder import get_embedder
+    RAG_IMPORTS_SUCCESS = True
+except ImportError as e:
+    logger.error(f"RAG imports failed: {e}")
+    RAG_IMPORTS_SUCCESS = False
+    # Create mock objects
+    DocumentProcessor = None
+    RAGRetriever = None
+    InsuranceChatbot = None
+    def create_rag_tables(): pass
+    def get_embedder(): return None
 
 # Load environment variables
 load_dotenv()
@@ -58,24 +78,39 @@ app.add_middleware(
 )
 
 # Check AI availability
-ai_available = ai_config.is_available()
-if ai_available:
-    logger.info("AI services initialized successfully")
+ai_available = False
+if AI_IMPORTS_SUCCESS:
+    try:
+        ai_available = ai_config.is_available()
+        if ai_available:
+            logger.info("AI services initialized successfully")
+        else:
+            logger.warning("AI services not available - using mock responses")
+    except Exception as e:
+        logger.error(f"AI config check failed: {e}")
+        ai_available = False
 else:
-    logger.warning("AI services not available - using mock responses")
+    logger.warning("AI imports failed - using mock responses")
 
 # Initialize RAG components with error handling
-try:
-    document_processor = DocumentProcessor()
-    rag_retriever = RAGRetriever()
-    chatbot = InsuranceChatbot()
-    logger.info("RAG components initialized successfully")
-except Exception as e:
-    logger.error(f"Failed to initialize RAG components: {e}")
-    # Continue without RAG components for basic functionality
-    document_processor = None
-    rag_retriever = None
-    chatbot = None
+document_processor = None
+rag_retriever = None
+chatbot = None
+
+if RAG_IMPORTS_SUCCESS:
+    try:
+        document_processor = DocumentProcessor()
+        rag_retriever = RAGRetriever()
+        chatbot = InsuranceChatbot()
+        logger.info("RAG components initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize RAG components: {e}")
+        # Continue without RAG components for basic functionality
+        document_processor = None
+        rag_retriever = None
+        chatbot = None
+else:
+    logger.warning("RAG imports failed - components not available")
 
 # Initialize database
 def init_db():
