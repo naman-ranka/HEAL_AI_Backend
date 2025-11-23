@@ -1,6 +1,7 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 import sqlite3
 import json
 import os
@@ -87,6 +88,33 @@ def init_db():
 # Initialize database on startup
 init_db()
 logger.info("Database and RAG system initialized")
+
+# Serve static files (frontend) in production
+if os.path.exists("static"):
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+    logger.info("Static files mounted at /static")
+    
+    # Serve frontend at root path for production
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        """Serve frontend files for production deployment"""
+        from fastapi.responses import FileResponse
+        
+        # API routes should not be caught by this
+        if full_path.startswith(("api/", "docs", "redoc", "health", "upload", "chat/", "bill-checker/", "admin/", "rag/", "debug/")):
+            raise HTTPException(status_code=404, detail="API endpoint not found")
+        
+        # Serve index.html for client-side routing
+        if not full_path or full_path == "index.html":
+            return FileResponse("static/index.html")
+        
+        # Serve static assets
+        file_path = f"static/{full_path}"
+        if os.path.exists(file_path):
+            return FileResponse(file_path)
+        
+        # Fallback to index.html for client-side routing
+        return FileResponse("static/index.html")
 
 @app.post("/upload", response_model=PolicyAnalysisOutput)
 async def upload_document(file: UploadFile = File(...)) -> PolicyAnalysisOutput:

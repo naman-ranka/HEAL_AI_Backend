@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: heal-ai
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    branch: main
+    healthCheckPath: /health
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ENVIRONMENT
+        value: production
+    disk:
+      name: heal-data
+      mountPath: /app/uploads
+      sizeGB: 1
